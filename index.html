@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#121212">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Drone Strike Ops - 100 Levels</title>
+    <title>Drone Strike Ops - Tactical AI</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         body { margin: 0; overflow: hidden; background: #050505; font-family: 'Courier New', Courier, monospace; touch-action: none; user-select: none; -webkit-user-select: none; }
@@ -58,8 +58,8 @@
 
     <div id="msg-overlay">
         <div class="msg-content">
-            <h1 id="msg-title">NIVEAU RÉUSSI</h1>
-            <p id="msg-desc">Préparation de la zone suivante...</p>
+            <h1 id="msg-title">MISSION ACCOMPLIE</h1>
+            <p id="msg-desc">Secteur sécurisé. Déploiement vers la zone suivante.</p>
             <button id="next-btn" class="restart-btn">NIVEAU SUIVANT</button>
         </div>
     </div>
@@ -101,24 +101,23 @@
                 const ctx = canvas.getContext('2d');
                 ctx.fillStyle = '#333'; ctx.fillRect(0,0,128,128);
                 ctx.strokeStyle = '#444'; ctx.lineWidth = 4;
-                ctx.strokeRect(10,10,108,108); // Bordure de toit
-                ctx.fillStyle = '#222'; ctx.fillRect(40,40,48,48); // Accès technique
+                ctx.strokeRect(10,10,108,108);
+                ctx.fillStyle = '#222'; ctx.fillRect(40,40,48,48);
                 return new THREE.CanvasTexture(canvas);
             }
         };
 
         let currentLevel = 1;
-        const SETTINGS = { speed: 0.18, inertia: 0.88, camSmooth: 0.06 };
+        const SETTINGS = { speed: 0.2, inertia: 0.88, camSmooth: 0.08 };
         let gameState = { 
             active: true, targetsLeft: 0, velocity: { x: 0, z: 0 }, input: { x: 0, y: 0 }, 
-            altitude: 6.0, camAngle: Math.PI / 4, camTargetAngle: Math.PI / 4 
+            altitude: 8.0, camAngle: Math.PI / 4, camTargetAngle: Math.PI / 4 
         };
 
         let scene, camera, renderer, drone, reticle, targets = [], buildings = [], rotors = [], bombs = [];
         const keys = { w: false, s: false, a: false, d: false, shift: false, ctrl: false };
 
         function setupLevel(lvl) {
-            // Nettoyage
             if(scene) {
                 while(scene.children.length > 0) scene.remove(scene.children[0]);
                 targets = []; buildings = []; rotors = []; bombs = [];
@@ -131,48 +130,48 @@
             }
 
             gameState.active = true;
-            gameState.targetsLeft = 4 + (lvl * 2);
+            gameState.targetsLeft = 4 + Math.floor(lvl * 1.5);
             document.getElementById('level-val').innerText = lvl;
             document.getElementById('targets').innerText = gameState.targetsLeft;
             document.getElementById('msg-overlay').style.display = 'none';
 
             scene.background = new THREE.Color(0x0a0f12);
-            scene.fog = new THREE.Fog(0x0a0f12, 40, 120);
+            scene.fog = new THREE.Fog(0x0a0f12, 50, 180);
             
             camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-            scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-            const sun = new THREE.DirectionalLight(0xffffff, 0.7);
-            sun.position.set(20, 50, 10);
+            scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+            const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+            sun.position.set(30, 60, 20);
             sun.castShadow = true;
             sun.shadow.mapSize.width = 2048;
             scene.add(sun);
 
-            // Sol
-            const floorRange = 50 + (lvl * 10);
+            // Taille de la zone de jeu progressive
+            const floorRange = 60 + (lvl * 8);
             const floor = new THREE.Mesh(new THREE.PlaneGeometry(floorRange * 2, floorRange * 2), new THREE.MeshStandardMaterial({ map: TextureGenerator.ground() }));
             floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
 
-            // Bâtiments (Toit propre)
-            const buildingCount = 5 + (lvl * 3);
+            // Bâtiments
+            const buildingCount = 4 + (lvl * 2);
             const sideTex = TextureGenerator.buildingSide();
             const topTex = TextureGenerator.buildingTop();
             
             for(let i=0; i<buildingCount; i++) {
-                const w = 4 + Math.random()*4, h = 6 + Math.random()*12, d = 4 + Math.random()*4;
+                const w = 5 + Math.random()*5, h = 8 + Math.random()*15, d = 5 + Math.random()*5;
                 const materials = [
-                    new THREE.MeshStandardMaterial({ map: sideTex }), // right
-                    new THREE.MeshStandardMaterial({ map: sideTex }), // left
-                    new THREE.MeshStandardMaterial({ map: topTex }),  // top (SANS FENETRE)
-                    new THREE.MeshStandardMaterial({ color: 0x111 }), // bottom
-                    new THREE.MeshStandardMaterial({ map: sideTex }), // front
-                    new THREE.MeshStandardMaterial({ map: sideTex })  // back
+                    new THREE.MeshStandardMaterial({ map: sideTex }),
+                    new THREE.MeshStandardMaterial({ map: sideTex }),
+                    new THREE.MeshStandardMaterial({ map: topTex }), 
+                    new THREE.MeshStandardMaterial({ color: 0x111 }),
+                    new THREE.MeshStandardMaterial({ map: sideTex }),
+                    new THREE.MeshStandardMaterial({ map: sideTex })
                 ];
                 const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), materials);
                 
-                const range = 20 + (lvl * 5);
-                let px = (Math.random()-0.5) * range * 2;
-                let pz = (Math.random()-0.5) * range * 2;
-                if(Math.abs(px) < 8 && Math.abs(pz) < 8) px += 15; // Dégager le spawn
+                const spawnRadius = 30 + (lvl * 4);
+                let px = (Math.random()-0.5) * spawnRadius * 2;
+                let pz = (Math.random()-0.5) * spawnRadius * 2;
+                if(Math.abs(px) < 12 && Math.abs(pz) < 12) px += 25;
 
                 b.position.set(px, h/2, pz);
                 b.castShadow = b.receiveShadow = true;
@@ -185,24 +184,57 @@
             drone.position.set(0, gameState.altitude, 0);
             scene.add(drone);
 
-            reticle = new THREE.Mesh(new THREE.RingGeometry(0.4, 0.5, 32), new THREE.MeshBasicMaterial({ color: 0xff3300, transparent: true, opacity: 0.8 }));
+            reticle = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.6, 32), new THREE.MeshBasicMaterial({ color: 0xff3300, transparent: true, opacity: 0.6 }));
             reticle.rotation.x = -Math.PI / 2;
             scene.add(reticle);
 
-            // Cibles
-            const soldierGeo = new THREE.CylinderGeometry(0.3, 0.35, 0.9, 8);
-            const soldierMat = new THREE.MeshStandardMaterial({ color: 0xff3333 });
+            // Ennemis (Design réaliste)
             for(let i=0; i<gameState.targetsLeft; i++) {
-                const s = new THREE.Mesh(soldierGeo, soldierMat);
-                s.position.set((Math.random()-0.5)*floorRange, 0.45, (Math.random()-0.5)*floorRange);
-                s.userData = { speed: 0.04 + (lvl*0.005), dir: Math.random()*Math.PI*2 };
-                s.castShadow = true; scene.add(s); targets.push(s);
+                const soldier = createSoldier();
+                const range = 40 + (lvl * 6);
+                soldier.position.set((Math.random()-0.5)*range*2, 0, (Math.random()-0.5)*range*2);
+                
+                // IA: Faction (statique) ou Patrouille (mobile)
+                const isFaction = Math.random() > 0.6;
+                soldier.userData = { 
+                    type: isFaction ? 'faction' : 'patrol',
+                    speed: 0.03 + (lvl * 0.003),
+                    angle: Math.random() * Math.PI * 2,
+                    targetAngle: Math.random() * Math.PI * 2,
+                    nextDecision: Date.now() + Math.random() * 3000
+                };
+                
+                targets.push(soldier);
+                scene.add(soldier);
             }
+        }
+
+        function createSoldier() {
+            const group = new THREE.Group();
+            const matUniform = new THREE.MeshStandardMaterial({ color: 0x2d3b24 }); // Vert kaki
+            const matSkin = new THREE.MeshStandardMaterial({ color: 0xd2b48c }); // Chair
+            const matGear = new THREE.MeshStandardMaterial({ color: 0x111111 }); // Noir équipement
+
+            // Corps
+            const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.15, 0.6, 6), matUniform);
+            body.position.y = 0.5; group.add(body);
+            // Tête
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), matSkin);
+            head.position.y = 0.9; group.add(head);
+            // Casque
+            const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 8, 0, Math.PI*2, 0, Math.PI/2), matGear);
+            helmet.position.y = 0.92; group.add(helmet);
+            // Bras/Arme
+            const gun = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.4), matGear);
+            gun.position.set(0.15, 0.6, 0.2); group.add(gun);
+
+            group.castShadow = true;
+            return group;
         }
 
         function createDrone() {
             const group = new THREE.Group();
-            const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.2, 0.8), new THREE.MeshStandardMaterial({ color: 0xeeeeee }));
+            const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.2, 0.8), new THREE.MeshStandardMaterial({ color: 0xffffff }));
             group.add(body);
             const rotorMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.6 });
             const pos = [[0.65, 0.45], [0.65, -0.45], [-0.65, 0.45], [-0.65, -0.45]];
@@ -217,13 +249,12 @@
 
         function fire() {
             if(!gameState.active) return;
-            const b = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 8), new THREE.MeshBasicMaterial({color: 0xffaa00}));
+            const b = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 8), new THREE.MeshBasicMaterial({color: 0xffaa00}));
             b.position.copy(drone.position);
             scene.add(b);
             bombs.push({mesh: b, vy: 0});
         }
 
-        // Logic loop
         function animate() {
             requestAnimationFrame(animate);
             if(!gameState.active) return;
@@ -233,51 +264,64 @@
             if(keys.a) mx = -1; if(keys.d) mx = 1;
             if(keys.w) my = -1; if(keys.s) my = 1;
             
-            gameState.altitude = THREE.MathUtils.clamp(gameState.altitude + (keys.shift ? 0.08 : (keys.ctrl ? -0.08 : 0)), 2, 40);
+            gameState.altitude = THREE.MathUtils.clamp(gameState.altitude + (keys.shift ? 0.1 : (keys.ctrl ? -0.1 : 0)), 3, 50);
             drone.position.y = gameState.altitude;
             document.getElementById('alt-val').innerText = gameState.altitude.toFixed(1);
 
-            const cos = Math.cos(gameState.camAngle); const sin = Math.sin(gameState.camAngle);
-            const rx = mx * cos - my * sin; const rz = mx * sin + my * cos;
-
-            gameState.velocity.x = (gameState.velocity.x + rx * SETTINGS.speed * 0.1) * SETTINGS.inertia;
-            gameState.velocity.z = (gameState.velocity.z + rz * SETTINGS.speed * 0.1) * SETTINGS.inertia;
+            // Mouvement relatif caméra
+            const forward = new THREE.Vector3();
+            camera.getWorldDirection(forward);
+            forward.y = 0; forward.normalize();
+            const right = new THREE.Vector3();
+            right.crossVectors(forward, camera.up);
+            
+            const moveDir = new THREE.Vector3();
+            moveDir.addScaledVector(forward, -my);
+            moveDir.addScaledVector(right, mx);
+            
+            gameState.velocity.x = (gameState.velocity.x + moveDir.x * SETTINGS.speed * 0.12) * SETTINGS.inertia;
+            gameState.velocity.z = (gameState.velocity.z + moveDir.z * SETTINGS.speed * 0.12) * SETTINGS.inertia;
+            
             drone.position.x += gameState.velocity.x;
             drone.position.z += gameState.velocity.z;
 
-            // Collisions batiments
+            // Collisions
             buildings.forEach(b => {
                 if (drone.position.x > b.minX-0.6 && drone.position.x < b.maxX+0.6 &&
                     drone.position.z > b.minZ-0.6 && drone.position.z < b.maxZ+0.6 &&
-                    drone.position.y < b.topY + 0.2) {
-                    gameOver("DRONE DÉTRUIT", "Collision avec un obstacle", "#ff3300", false);
+                    drone.position.y < b.topY + 0.5) {
+                    gameOver("DRONE PERDU", "Collision avec une structure", "#ff3300", false);
                 }
             });
 
-            rotors.forEach(r => r.rotation.y += 0.6);
-            drone.rotation.z = -gameState.velocity.x * 1.2;
-            drone.rotation.x = gameState.velocity.z * 1.2;
-            drone.rotation.y = THREE.MathUtils.lerp(drone.rotation.y, -gameState.camAngle + Math.PI/4, 0.1);
+            // Visuel Drone
+            rotors.forEach(r => r.rotation.y += 0.8);
+            if (moveDir.length() > 0.05) {
+                const targetRotY = Math.atan2(moveDir.x, moveDir.z);
+                drone.rotation.y = THREE.MathUtils.lerp(drone.rotation.y, targetRotY, 0.1);
+            }
+            drone.rotation.z = THREE.MathUtils.lerp(drone.rotation.z, -mx * 0.45, 0.1);
+            drone.rotation.x = THREE.MathUtils.lerp(drone.rotation.x, -my * 0.45, 0.1);
 
             reticle.position.set(drone.position.x, 0.1, drone.position.z);
 
-            // Camera
+            // Caméra
             gameState.camAngle = THREE.MathUtils.lerp(gameState.camAngle, gameState.camTargetAngle, 0.1);
-            const camDist = 16 + (gameState.altitude * 0.5);
+            const camDist = 20 + (gameState.altitude * 0.6);
             camera.position.lerp(new THREE.Vector3(
                 drone.position.x + Math.cos(gameState.camAngle) * camDist,
-                gameState.altitude + 15,
+                gameState.altitude + 20,
                 drone.position.z + Math.sin(gameState.camAngle) * camDist
             ), SETTINGS.camSmooth);
             camera.lookAt(drone.position.x, 0, drone.position.z);
 
-            // Bombs
+            // Bombes
             for(let i=bombs.length-1; i>=0; i--) {
                 bombs[i].vy -= 0.025; bombs[i].mesh.position.y += bombs[i].vy;
                 if(bombs[i].mesh.position.y <= 0) {
                     const p = bombs[i].mesh.position;
                     targets.forEach((t, idx) => {
-                        if(t.position.distanceTo(p) < 3.5) {
+                        if(t.position.distanceTo(p) < 4.5) {
                             scene.remove(t); targets.splice(idx, 1);
                             gameState.targetsLeft--; document.getElementById('targets').innerText = gameState.targetsLeft;
                         }
@@ -287,10 +331,30 @@
                 }
             }
 
+            // IA Soldats
             targets.forEach(t => {
-                t.position.x += Math.cos(t.userData.dir) * t.userData.speed;
-                t.position.z += Math.sin(t.userData.dir) * t.userData.speed;
-                if(Math.abs(t.position.x) > 100 || Math.abs(t.position.z) > 100) t.userData.dir += Math.PI;
+                const data = t.userData;
+                const now = Date.now();
+
+                if (data.type === 'patrol') {
+                    // Gravite vers le centre avec un peu de bruit
+                    const distToCenter = Math.sqrt(t.position.x**2 + t.position.z**2);
+                    const angleToCenter = Math.atan2(-t.position.z, -t.position.x);
+                    
+                    // On mélange la direction vers le centre et sa direction actuelle
+                    data.angle = THREE.MathUtils.lerp(data.angle, angleToCenter + (Math.sin(now/1000)*0.5), 0.02);
+                    
+                    t.position.x += Math.cos(data.angle) * data.speed;
+                    t.position.z += Math.sin(data.angle) * data.speed;
+                    t.rotation.y = -data.angle + Math.PI/2;
+                } else {
+                    // Faction : Tourne sur soi-même pour surveiller
+                    if (now > data.nextDecision) {
+                        data.targetAngle = Math.random() * Math.PI * 2;
+                        data.nextDecision = now + 2000 + Math.random()*3000;
+                    }
+                    t.rotation.y = THREE.MathUtils.lerp(t.rotation.y, data.targetAngle, 0.05);
+                }
             });
 
             renderer.render(scene, camera);
@@ -312,7 +376,6 @@
             }
         }
 
-        // Init Inputs
         function initInputs() {
             const stick = document.getElementById('stick');
             const joyZone = document.getElementById('joystick-zone');
@@ -332,7 +395,7 @@
             const viewZone = document.getElementById('view-zone');
             let viewActive = false, viewLastX = 0;
             const startView = (x) => { viewActive = true; viewLastX = x; };
-            const moveView = (x) => { if(viewActive) { gameState.camTargetAngle -= (x - viewLastX) * 0.005; viewLastX = x; } };
+            const moveView = (x) => { if(viewActive) { gameState.camTargetAngle -= (x - viewLastX) * 0.007; viewLastX = x; } };
 
             joyZone.addEventListener('mousedown', e => startJoy(e.clientX, e.clientY));
             joyZone.addEventListener('touchstart', e => { e.preventDefault(); startJoy(e.touches[0].clientX, e.touches[0].clientY); }, {passive:false});
@@ -347,13 +410,11 @@
                 }
             }, {passive:false});
 
-            window.addEventListener('mouseup', () => { joyActive = viewActive = false; stick.style.transform = "translate(0,0)"; gameState.input = {x:0, y:0}; });
-            window.addEventListener('touchend', () => { joyActive = viewActive = false; stick.style.transform = "translate(0,0)"; gameState.input = {x:0, y:0}; });
+            const resetJoy = () => { joyActive = viewActive = false; stick.style.transform = "translate(0,0)"; gameState.input = {x:0, y:0}; };
+            window.addEventListener('mouseup', resetJoy);
+            window.addEventListener('touchend', resetJoy);
 
-            document.getElementById('btn-fire').addEventListener('mousedown', fire);
-            document.getElementById('btn-fire').addEventListener('touchstart', e => { e.preventDefault(); fire(); }, {passive:false});
-
-            let altIn = 0;
+            document.getElementById('btn-fire').addEventListener('click', fire);
             const btnU = document.getElementById('btn-up'), btnD = document.getElementById('btn-down');
             btnU.onmousedown = btnU.ontouchstart = (e) => { e.preventDefault(); keys.shift = true; };
             btnU.onmouseup = btnU.onmouseleave = btnU.ontouchend = () => keys.shift = false;
