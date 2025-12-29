@@ -6,260 +6,391 @@
     <meta name="theme-color" content="#121212">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Drone Strike Ops</title>
-    <!-- Chargement de Three.js r128 -->
+    <title>Drone Strike Ops Pro - Hybrid Controls</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; background: #121212; font-family: 'Courier New', Courier, monospace; touch-action: none; user-select: none; -webkit-user-select: none; }
+        body { margin: 0; overflow: hidden; background: #050505; font-family: 'Courier New', Courier, monospace; touch-action: none; user-select: none; -webkit-user-select: none; }
+        
+        #ui-layer::after {
+            content: " ";
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            background-size: 100% 4px, 3px 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
-        .hud-top { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; color: #00ffcc; text-shadow: 0 0 5px rgba(0, 255, 204, 0.5); font-weight: bold; font-size: 14px; }
-        .hud-box { background: rgba(0, 20, 10, 0.6); padding: 5px 10px; border: 1px solid #00ffcc; border-radius: 4px; }
-        .controls-area { position: absolute; bottom: 20px; width: 100%; height: 150px; display: flex; justify-content: space-between; align-items: flex-end; padding: 0 20px; box-sizing: border-box; }
-        #joystick-zone { width: 120px; height: 120px; position: relative; pointer-events: auto; cursor: crosshair; }
-        .joystick-base { width: 100%; height: 100%; background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 50%; position: absolute; top: 0; left: 0; }
-        .joystick-stick { width: 50px; height: 50px; background: rgba(0, 255, 204, 0.5); border-radius: 50%; position: absolute; top: 35px; left: 35px; box-shadow: 0 0 10px #00ffcc; transition: transform 0.1s; }
-        #action-zone { pointer-events: auto; display: flex; gap: 15px; }
-        .btn-action { width: 80px; height: 80px; border-radius: 50%; border: 2px solid #ff3300; background: rgba(50, 10, 0, 0.6); color: #ff3300; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; box-shadow: 0 0 15px rgba(255, 51, 0, 0.3); transition: transform 0.1s; text-transform: uppercase; cursor: pointer; }
-        .btn-action:active { transform: scale(0.9); background: rgba(255, 51, 0, 0.3); }
-        #pc-hint { display: none; position: absolute; bottom: 10px; width: 100%; text-align: center; color: rgba(255,255,255,0.3); font-size: 10px; }
-        #msg-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; display: none; pointer-events: auto; }
-        .msg-content { color: white; text-align: center; border: 2px solid #00ffcc; padding: 30px; background: rgba(0, 50, 50, 0.8); box-shadow: 0 0 30px rgba(0, 255, 204, 0.4); max-width: 80%; }
-        button.restart-btn { margin-top: 20px; padding: 15px 30px; background: #00ffcc; border: none; font-weight: bold; font-size: 18px; color: black; cursor: pointer; }
+        .hud-top { position: absolute; top: 15px; left: 15px; right: 15px; display: flex; justify-content: space-between; color: #00ffcc; text-shadow: 0 0 10px #00ffcc; font-weight: bold; font-size: 14px; }
+        .hud-box { background: rgba(0, 20, 10, 0.7); padding: 8px 15px; border: 1px solid #00ffcc; border-radius: 2px; }
+        
+        .pc-hint { position: absolute; top: 80px; left: 15px; color: rgba(255, 255, 255, 0.7); font-size: 10px; line-height: 1.4; background: rgba(0,0,0,0.4); padding: 5px; border-radius: 4px; }
+
+        .controls-area { position: absolute; bottom: 30px; width: 100%; display: flex; justify-content: space-between; align-items: flex-end; padding: 0 20px; box-sizing: border-box; }
+        
+        #joystick-zone { width: 110px; height: 110px; position: relative; pointer-events: auto; cursor: crosshair; }
+        .joystick-base { width: 100%; height: 100%; background: rgba(255, 255, 255, 0.05); border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; position: absolute; }
+        .joystick-stick { width: 45px; height: 45px; background: rgba(255,255,255,0.8); border-radius: 50%; position: absolute; top: 32.5px; left: 32.5px; box-shadow: 0 0 15px rgba(255,255,255,0.5); pointer-events: none; }
+
+        #action-zone { pointer-events: auto; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+        .btn-action { width: 70px; height: 70px; border-radius: 50%; border: 2px solid #fff; background: rgba(255, 255, 255, 0.1); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px; cursor: pointer; transition: transform 0.1s; }
+        .btn-fire { width: 85px; height: 85px; border-color: #ff3300; color: #ff3300; background: rgba(255, 51, 0, 0.1); box-shadow: 0 0 15px rgba(255, 51, 0, 0.3); font-size: 14px; }
+        .btn-action:active { transform: scale(0.9); }
+
+        #msg-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 20; pointer-events: auto; }
+        .msg-content { border: 1px solid #00ffcc; padding: 40px; background: #0a0a0a; color: #00ffcc; text-align: center; }
+        .restart-btn { margin-top: 25px; padding: 12px 25px; background: #00ffcc; border: none; font-weight: bold; color: black; cursor: pointer; }
     </style>
 </head>
 <body>
 
     <div id="ui-layer">
         <div class="hud-top">
-            <div class="hud-box">BATTERIE: <span id="fuel">100</span>%</div>
+            <div class="hud-box">ALT: <span id="alt-val">6.0</span>m</div>
             <div class="hud-box">CIBLES: <span id="targets">0</span></div>
         </div>
-
+        <div class="pc-hint">
+            ZQSD : DIRECTION<br>
+            SOURIS : JOYSTICK GAUCHE<br>
+            ESPACE : FEU<br>
+            MAJ : MONTER<br>
+            CTRL : BAISSER
+        </div>
         <div class="controls-area">
             <div id="joystick-zone">
                 <div class="joystick-base"></div>
                 <div class="joystick-stick" id="stick"></div>
             </div>
             <div id="action-zone">
-                <div class="btn-action" id="btn-fire">LARGUE</div>
+                <div class="btn-action" id="btn-up">MONTER</div>
+                <div class="btn-action btn-fire" id="btn-fire">FEU</div>
+                <div class="btn-action" id="btn-down">BAISSER</div>
             </div>
         </div>
-        <div id="pc-hint">PC: FLÈCHES/ZQSD pour bouger, ESPACE pour tirer</div>
     </div>
 
     <div id="msg-overlay">
         <div class="msg-content">
-            <h1 id="msg-title">MISSION ACCOMPLIE</h1>
-            <p id="msg-text">Zone sécurisée. Retour à la base.</p>
-            <button class="restart-btn" onclick="location.reload()">REJOUER</button>
+            <h1 id="msg-title">MISSION TERMINÉE</h1>
+            <p id="msg-desc">STATUS OK</p>
+            <button class="restart-btn" onclick="location.reload()">RELOG</button>
         </div>
     </div>
 
     <script>
-        const SETTINGS = { speed: 0.15, inertia: 0.92, tilt: 0.3, camSmooth: 0.1 };
-        let gameState = { active: true, fuel: 100, targetsLeft: 0, velocity: { x: 0, z: 0 }, input: { x: 0, y: 0 } };
+        /** * GÉNÉRATEUR DE TEXTURES PROCÉDURALES */
+        const TextureGenerator = {
+            ground: () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#3a4d2c'; 
+                ctx.fillRect(0,0,512,512);
+                const colors = ['#4d4433', '#5c5443', '#2d3b24', '#6b6354'];
+                for(let i=0; i<400; i++) {
+                    ctx.fillStyle = colors[Math.floor(Math.random()*colors.length)];
+                    ctx.globalAlpha = 0.4;
+                    ctx.beginPath();
+                    const size = Math.random()*60 + 20;
+                    ctx.arc(Math.random()*512, Math.random()*512, size, 0, Math.PI*2);
+                    ctx.fill();
+                }
+                ctx.globalAlpha = 0.1;
+                for(let i=0; i<10000; i++) {
+                    ctx.fillStyle = Math.random() > 0.5 ? '#ffffff' : '#000000';
+                    ctx.fillRect(Math.random()*512, Math.random()*512, 1, 1);
+                }
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(8, 8);
+                return tex;
+            },
+            soldier: () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = canvas.height = 128;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#2d3e2d';
+                ctx.fillRect(0, 0, 128, 128);
+                const colors = ['#1b261b', '#3d2b1f', '#4a5d4a'];
+                for(let i=0; i<30; i++) {
+                    ctx.fillStyle = colors[Math.floor(Math.random()*colors.length)];
+                    ctx.beginPath();
+                    ctx.arc(Math.random()*128, Math.random()*128, Math.random()*20+5, 0, Math.PI*2);
+                    ctx.fill();
+                }
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+                return tex;
+            },
+            drone: () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#1a1a1a';
+                ctx.fillRect(0,0,256,256);
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                for(let i=0; i<10; i++) ctx.strokeRect(Math.random()*256, Math.random()*256, 40, 40);
+                ctx.fillStyle = '#00ffcc'; ctx.fillRect(200, 20, 10, 5);
+                ctx.fillStyle = '#ff3300'; ctx.fillRect(220, 20, 10, 5);
+                return new THREE.CanvasTexture(canvas);
+            },
+            building: () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#333';
+                ctx.fillRect(0,0,256,256);
+                for(let i=0; i<2000; i++) {
+                    ctx.fillStyle = `rgba(255,255,255,${Math.random()*0.05})`;
+                    ctx.fillRect(Math.random()*256, Math.random()*256, 1, 1);
+                }
+                for(let y=20; y<236; y+=30) {
+                    for(let x=20; x<236; x+=25) {
+                        ctx.fillStyle = Math.random() > 0.9 ? '#ffcc00' : '#111';
+                        ctx.fillRect(x, y, 15, 20);
+                    }
+                }
+                return new THREE.CanvasTexture(canvas);
+            }
+        };
 
-        if (!('ontouchstart' in window)) {
-            document.getElementById('pc-hint').style.display = 'block';
+        const SETTINGS = { speed: 0.16, inertia: 0.90, camSmooth: 0.08 };
+        let gameState = { active: true, targetsLeft: 0, velocity: { x: 0, z: 0 }, input: { x: 0, y: 0 }, altitude: 6.0 };
+        let buildings = [];
+        let rotors = [];
+        const textures = {
+            ground: TextureGenerator.ground(),
+            soldier: TextureGenerator.soldier(),
+            drone: TextureGenerator.drone(),
+            building: TextureGenerator.building()
+        };
+
+        const keys = { w: false, s: false, a: false, d: false, shift: false, ctrl: false };
+        window.addEventListener('keydown', e => {
+            const k = e.key.toLowerCase();
+            if(k === 'z' || k === 'w' || e.key === 'ArrowUp') keys.w = true;
+            if(k === 's' || e.key === 'ArrowDown') keys.s = true;
+            if(k === 'q' || k === 'a' || e.key === 'ArrowLeft') keys.a = true;
+            if(k === 'd' || e.key === 'ArrowRight') keys.d = true;
+            if(e.shiftKey) keys.shift = true;
+            if(e.ctrlKey) keys.ctrl = true;
+            if(k === ' ') { fire(); }
+        });
+        window.addEventListener('keyup', e => {
+            const k = e.key.toLowerCase();
+            if(k === 'z' || k === 'w' || e.key === 'ArrowUp') keys.w = false;
+            if(k === 's' || e.key === 'ArrowDown') keys.s = false;
+            if(k === 'q' || k === 'a' || e.key === 'ArrowLeft') keys.a = false;
+            if(k === 'd' || e.key === 'ArrowRight') keys.d = false;
+            if(!e.shiftKey) keys.shift = false;
+            if(!e.ctrlKey) keys.ctrl = false;
+        });
+
+        let bombs = [];
+        let scene, camera, renderer, drone, reticle, targets = [];
+
+        function fire() {
+            if(!gameState.active) return;
+            const b = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 8), new THREE.MeshBasicMaterial({color: 0xffaa00}));
+            b.position.copy(drone.position);
+            scene.add(b);
+            bombs.push({mesh: b, vy: 0});
         }
 
         function initGame() {
-            if (typeof THREE === 'undefined') return;
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x05080a); 
+            scene.fog = new THREE.Fog(0x05080a, 20, 80);
 
-            const scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x101015);
-            scene.fog = new THREE.Fog(0x101015, 15, 45);
-
-            const aspect = window.innerWidth / window.innerHeight;
-            const d = 12;
-            const camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 1, 1000);
-            camera.position.set(20, 20, 20);
-            camera.lookAt(0, 0, 0);
-
-            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.shadowMap.enabled = true;
             document.body.appendChild(renderer.domElement);
 
-            const ambient = new THREE.AmbientLight(0xffffff, 0.4);
-            scene.add(ambient);
+            scene.add(new THREE.AmbientLight(0xffffff, 0.4));
             const sun = new THREE.DirectionalLight(0xffffff, 0.8);
-            sun.position.set(10, 20, 10);
+            sun.position.set(20, 40, 10);
             sun.castShadow = true;
+            sun.shadow.mapSize.width = 2048;
             scene.add(sun);
 
-            const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshStandardMaterial({ color: 0x2a2a2e }));
+            const floorGeo = new THREE.PlaneGeometry(150, 150);
+            const floorMat = new THREE.MeshStandardMaterial({ map: textures.ground, roughness: 0.9, metalness: 0.1 });
+            const floor = new THREE.Mesh(floorGeo, floorMat);
             floor.rotation.x = -Math.PI / 2;
             floor.receiveShadow = true;
             scene.add(floor);
 
-            for(let i=0; i<15; i++) {
-                const h = Math.random() * 3 + 1;
-                const b = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshStandardMaterial({color: 0x444444}));
-                b.scale.set(Math.random()*2+1, h, Math.random()*2+1);
-                b.position.set(Math.random()*30-15, h/2, Math.random()*30-15);
-                b.castShadow = true;
-                b.receiveShadow = true;
-                scene.add(b);
+            for(let i=0; i<25; i++) {
+                const w = Math.random()*4+2, h = Math.random()*10+5, d = Math.random()*4+2;
+                const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ map: textures.building }));
+                b.position.set(Math.random()*60-30, h/2, Math.random()*60-30);
+                if(b.position.length() < 10) b.position.x += 15;
+                b.castShadow = b.receiveShadow = true; scene.add(b);
+                buildings.push({minX: b.position.x-w/2, maxX: b.position.x+w/2, minZ: b.position.z-d/2, maxZ: b.position.z+d/2, topY: h});
             }
 
-            const droneGroup = new THREE.Group();
-            const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.2, 0.8), new THREE.MeshPhongMaterial({color: 0x222222}));
-            body.castShadow = true;
-            droneGroup.add(body);
-            const arm1 = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.05, 0.1), new THREE.MeshPhongMaterial({color: 0x555555}));
-            const arm2 = arm1.clone(); arm2.rotation.y = Math.PI/2;
-            droneGroup.add(arm1); droneGroup.add(arm2);
-            droneGroup.position.set(0, 5, 0);
-            scene.add(droneGroup);
+            drone = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.BoxGeometry(1, 0.18, 0.65), new THREE.MeshStandardMaterial({map: textures.drone, metalness: 0.8}));
+            drone.add(body);
+            [[0.4, 0.28], [0.4, -0.28], [-0.4, 0.28], [-0.4, -0.28]].forEach(p => {
+                const r = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.01, 0.04), new THREE.MeshBasicMaterial({color: 0x111111, transparent: true, opacity: 0.9}));
+                r.position.set(p[0], 0.1, p[1]); drone.add(r); rotors.push(r);
+            });
+            drone.position.set(0, gameState.altitude, 0); scene.add(drone);
 
-            const reticle = new THREE.Mesh(new THREE.RingGeometry(0.4, 0.5, 32), new THREE.MeshBasicMaterial({ color: 0xff3300, transparent: true, opacity: 0.7, side: THREE.DoubleSide }));
-            reticle.rotation.x = -Math.PI / 2;
-            reticle.position.y = 0.05;
-            scene.add(reticle);
+            reticle = new THREE.Mesh(new THREE.RingGeometry(0.4, 0.5, 32), new THREE.MeshBasicMaterial({color: 0xff3300, transparent:true, opacity:0.6}));
+            reticle.rotation.x = -Math.PI/2; scene.add(reticle);
 
-            let targets = [];
-            const targetGeo = new THREE.CylinderGeometry(0.25, 0.25, 0.8, 8); 
-            const targetMat = new THREE.MeshPhongMaterial({color: 0xff3333});
-            
-            function spawnTargets(count) {
+            const soldierMat = new THREE.MeshStandardMaterial({ map: textures.soldier });
+            function spawn(count) {
                 gameState.targetsLeft = count;
                 document.getElementById('targets').innerText = count;
                 for(let i=0; i<count; i++) {
-                    const t = new THREE.Mesh(targetGeo, targetMat);
-                    t.position.set(Math.random()*20-10, 0.65, Math.random()*20-10);
-                    t.castShadow = true;
-                    t.userData = { speed: Math.random() * 0.02 + 0.01, dir: Math.random() * Math.PI * 2 };
-                    scene.add(t);
-                    targets.push(t);
+                    const s = new THREE.Group();
+                    const b = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 0.6, 8), soldierMat);
+                    b.position.y = 0.3; s.add(b);
+                    const h = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 8), soldierMat);
+                    h.position.y = 0.7; s.add(h);
+                    s.position.set(Math.random()*50-25, 0, Math.random()*50-25);
+                    s.userData = { speed: 0.02 + Math.random()*0.02, dir: Math.random()*Math.PI*2 };
+                    s.castShadow = true; scene.add(s); targets.push(s);
                 }
             }
-            spawnTargets(5);
+            spawn(15);
 
-            let bombs = [];
-            const bombGeo = new THREE.SphereGeometry(0.15, 8, 8);
-            const bombMat = new THREE.MeshBasicMaterial({color: 0xffff00});
-
-            const joystickZone = document.getElementById('joystick-zone');
+            // Joystick Logic (Hybrid: Touch & Mouse)
             const stick = document.getElementById('stick');
-            let stickData = { startX: 0, startY: 0, active: false };
+            const zone = document.getElementById('joystick-zone');
+            let inputActive = false, startPos = {x:0, y:0};
 
-            function handleStickStart(x, y) { stickData.startX = x; stickData.startY = y; stickData.active = true; }
-            function handleStickMove(x, y) {
-                if(!stickData.active) return;
-                let dx = x - stickData.startX;
-                let dy = y - stickData.startY;
-                const maxDist = 35;
-                const distance = Math.min(Math.sqrt(dx*dx + dy*dy), maxDist);
-                const angle = Math.atan2(dy, dx);
-                const clampedX = Math.cos(angle) * distance;
-                const clampedY = Math.sin(angle) * distance;
-                stick.style.transform = `translate(${clampedX}px, ${clampedY}px)`;
-                gameState.input.x = clampedX / maxDist;
-                gameState.input.y = clampedY / maxDist;
-            }
-            function handleStickEnd() {
-                stickData.active = false;
-                stick.style.transform = `translate(0px, 0px)`;
-                if (!Object.values(keysPressed).some(v => v)) { gameState.input.x = 0; gameState.input.y = 0; }
-            }
+            const updateJoystick = (clientX, clientY) => {
+                if(!inputActive) return;
+                const dx = clientX - startPos.x;
+                const dy = clientY - startPos.y;
+                const dist = Math.min(Math.sqrt(dx*dx+dy*dy), 40);
+                const ang = Math.atan2(dy, dx);
+                stick.style.transform = `translate(${Math.cos(ang)*dist}px, ${Math.sin(ang)*dist}px)`;
+                gameState.input.x = (Math.cos(ang)*dist)/40;
+                gameState.input.y = (Math.sin(ang)*dist)/40;
+            };
 
-            joystickZone.addEventListener('touchstart', e => { e.preventDefault(); handleStickStart(e.touches[0].clientX, e.touches[0].clientY); }, {passive:false});
-            window.addEventListener('touchmove', e => { if(stickData.active) handleStickMove(e.touches[0].clientX, e.touches[0].clientY); }, {passive:false});
-            window.addEventListener('touchend', handleStickEnd);
+            const startAction = (clientX, clientY) => {
+                inputActive = true;
+                const rect = zone.getBoundingClientRect();
+                startPos = { x: rect.left + rect.width/2, y: rect.top + rect.height/2 };
+                updateJoystick(clientX, clientY);
+            };
 
-            joystickZone.addEventListener('mousedown', e => handleStickStart(e.clientX, e.clientY));
-            window.addEventListener('mousemove', e => handleStickMove(e.clientX, e.clientY));
-            window.addEventListener('mouseup', handleStickEnd);
+            const endAction = () => {
+                inputActive = false;
+                stick.style.transform = "translate(0,0)";
+                gameState.input = {x:0, y:0};
+            };
 
-            const btnFire = document.getElementById('btn-fire');
-            function fire() { dropBomb(); btnFire.style.transform = "scale(0.9)"; setTimeout(()=>btnFire.style.transform="scale(1)", 100); }
-            btnFire.addEventListener('touchstart', e => { e.preventDefault(); fire(); });
-            btnFire.addEventListener('mousedown', fire);
+            // Touch Events
+            zone.addEventListener('touchstart', e => { e.preventDefault(); startAction(e.touches[0].clientX, e.touches[0].clientY); });
+            window.addEventListener('touchmove', e => { if(inputActive) updateJoystick(e.touches[0].clientX, e.touches[0].clientY); });
+            window.addEventListener('touchend', endAction);
 
-            let keysPressed = { up: false, down: false, left: false, right: false };
-            window.addEventListener('keydown', e => {
-                if(!gameState.active) return;
-                if(e.code==='ArrowUp'||e.code==='KeyW'||e.code==='KeyZ') keysPressed.up = true;
-                if(e.code==='ArrowDown'||e.code==='KeyS') keysPressed.down = true;
-                if(e.code==='ArrowLeft'||e.code==='KeyA'||e.code==='KeyQ') keysPressed.left = true;
-                if(e.code==='ArrowRight'||e.code==='KeyD') keysPressed.right = true;
-                if(e.code==='Space') fire();
-                updateKeys();
-            });
-            window.addEventListener('keyup', e => {
-                if(e.code==='ArrowUp'||e.code==='KeyW'||e.code==='KeyZ') keysPressed.up = false;
-                if(e.code==='ArrowDown'||e.code==='KeyS') keysPressed.down = false;
-                if(e.code==='ArrowLeft'||e.code==='KeyA'||e.code==='KeyQ') keysPressed.left = false;
-                if(e.code==='ArrowRight'||e.code==='KeyD') keysPressed.right = false;
-                updateKeys();
-            });
-            function updateKeys() {
-                if(stickData.active) return;
-                let x = 0, y = 0;
-                if(keysPressed.up) y -= 1; if(keysPressed.down) y += 1;
-                if(keysPressed.left) x -= 1; if(keysPressed.right) x += 1;
-                gameState.input.x = x; gameState.input.y = y;
-            }
+            // Mouse Events
+            zone.addEventListener('mousedown', e => { e.preventDefault(); startAction(e.clientX, e.clientY); });
+            window.addEventListener('mousemove', e => { if(inputActive) updateJoystick(e.clientX, e.clientY); });
+            window.addEventListener('mouseup', endAction);
 
-            function dropBomb() {
-                if(!gameState.active) return;
-                const b = new THREE.Mesh(bombGeo, bombMat);
-                b.position.copy(droneGroup.position);
-                scene.add(b);
-                bombs.push({ mesh: b, vy: 0 });
-            }
-
-            function explode(pos) {
-                const flash = new THREE.PointLight(0xffaa00, 2, 5);
-                flash.position.copy(pos); scene.add(flash);
-                setTimeout(() => scene.remove(flash), 100);
-                for(let i = targets.length - 1; i >= 0; i--) {
-                    if(new THREE.Vector2(pos.x, pos.z).distanceTo(new THREE.Vector2(targets[i].position.x, targets[i].position.z)) < 1.5) {
-                        scene.remove(targets[i]); targets.splice(i, 1);
-                        gameState.targetsLeft--;
-                        document.getElementById('targets').innerText = gameState.targetsLeft;
-                    }
-                }
-                if(gameState.targetsLeft === 0) gameOver(true);
-            }
-
-            function gameOver(win) {
-                gameState.active = false;
-                document.getElementById('msg-overlay').style.display = 'flex';
-                document.getElementById('msg-title').innerText = win ? "MISSION ACCOMPLIE" : "ECHEC";
-            }
+            // Mobile Buttons
+            let altInput = 0;
+            document.getElementById('btn-up').onmousedown = document.getElementById('btn-up').ontouchstart = (e) => { e.preventDefault(); altInput = 0.06; };
+            document.getElementById('btn-down').onmousedown = document.getElementById('btn-down').ontouchstart = (e) => { e.preventDefault(); altInput = -0.06; };
+            window.onmouseup = window.ontouchend = () => altInput = 0;
+            document.getElementById('btn-fire').onclick = fire;
 
             function animate() {
                 requestAnimationFrame(animate);
-                if(gameState.active) {
-                    gameState.velocity.x = (gameState.velocity.x + gameState.input.x * SETTINGS.speed * 0.1) * SETTINGS.inertia;
-                    gameState.velocity.z = (gameState.velocity.z + gameState.input.y * SETTINGS.speed * 0.1) * SETTINGS.inertia;
-                    droneGroup.position.x += gameState.velocity.x;
-                    droneGroup.position.z += gameState.velocity.z;
-                    droneGroup.rotation.z = -gameState.velocity.x * 2;
-                    droneGroup.rotation.x = gameState.velocity.z * 2;
-                    reticle.position.x = droneGroup.position.x;
-                    reticle.position.z = droneGroup.position.z;
-                    camera.position.x += (droneGroup.position.x + 20 - camera.position.x) * SETTINGS.camSmooth;
-                    camera.position.z += (droneGroup.position.z + 20 - camera.position.z) * SETTINGS.camSmooth;
-                    camera.lookAt(droneGroup.position.x, 0, droneGroup.position.z);
-                    for(let i = bombs.length - 1; i >= 0; i--) {
-                        bombs[i].vy -= 0.02; bombs[i].mesh.position.y += bombs[i].vy;
-                        if(bombs[i].mesh.position.y <= 0) { explode(bombs[i].mesh.position); scene.remove(bombs[i].mesh); bombs.splice(i, 1); }
+                if(!gameState.active) return;
+
+                let moveX = gameState.input.x;
+                let moveY = gameState.input.y;
+                if(keys.a) moveX = -1; if(keys.d) moveX = 1;
+                if(keys.w) moveY = -1; if(keys.s) moveY = 1;
+                
+                let combinedAlt = altInput;
+                if(keys.shift) combinedAlt = 0.06;
+                if(keys.ctrl) combinedAlt = -0.06;
+
+                gameState.altitude = THREE.MathUtils.clamp(gameState.altitude + combinedAlt, 1.5, 20);
+                drone.position.y = gameState.altitude;
+                document.getElementById('alt-val').innerText = gameState.altitude.toFixed(1);
+
+                gameState.velocity.x = (gameState.velocity.x + moveX * SETTINGS.speed * 0.1) * SETTINGS.inertia;
+                gameState.velocity.z = (gameState.velocity.z + moveY * SETTINGS.speed * 0.1) * SETTINGS.inertia;
+                drone.position.x += gameState.velocity.x;
+                drone.position.z += gameState.velocity.z;
+
+                buildings.forEach(b => {
+                    const pad = 0.55;
+                    if (drone.position.x > b.minX - pad && drone.position.x < b.maxX + pad &&
+                        drone.position.z > b.minZ - pad && drone.position.z < b.maxZ + pad &&
+                        drone.position.y < b.topY + 0.1) {
+                        gameOver("CRASH", "DRONE DÉTRUIT", "#ff3300");
                     }
-                    targets.forEach(t => {
-                        t.position.x += Math.cos(t.userData.dir) * t.userData.speed;
-                        t.position.z += Math.sin(t.userData.dir) * t.userData.speed;
-                        if(Math.abs(t.position.x) > 15 || Math.abs(t.position.z) > 15) t.userData.dir += Math.PI;
-                    });
+                });
+
+                rotors.forEach(r => r.rotation.y += 0.8);
+                drone.rotation.z = -gameState.velocity.x * 1.5;
+                drone.rotation.x = gameState.velocity.z * 1.5;
+
+                reticle.position.set(drone.position.x, 0.05, drone.position.z);
+                const camDist = 14 + (gameState.altitude * 0.4);
+                camera.position.x += (drone.position.x + camDist - camera.position.x) * SETTINGS.camSmooth;
+                camera.position.z += (drone.position.z + camDist - camera.position.z) * SETTINGS.camSmooth;
+                camera.position.y += (gameState.altitude + 14 - camera.position.y) * SETTINGS.camSmooth;
+                camera.lookAt(drone.position.x, 0, drone.position.z);
+
+                for(let i=bombs.length-1; i>=0; i--) {
+                    bombs[i].vy -= 0.025; bombs[i].mesh.position.y += bombs[i].vy;
+                    if(bombs[i].mesh.position.y <= 0) {
+                        const p = bombs[i].mesh.position;
+                        const f = new THREE.PointLight(0xffaa44, 5, 12); f.position.set(p.x, 1, p.z); scene.add(f);
+                        setTimeout(() => scene.remove(f), 120);
+                        targets.forEach((t, idx) => {
+                            if(t.position.distanceTo(p) < 2.8) {
+                                scene.remove(t); targets.splice(idx, 1);
+                                gameState.targetsLeft--; document.getElementById('targets').innerText = gameState.targetsLeft;
+                            }
+                        });
+                        scene.remove(bombs[i].mesh); bombs.splice(i, 1);
+                        if(gameState.targetsLeft === 0) gameOver("MISSION RÉUSSIE", "ZONE SÉCURISÉE", "#00ffcc");
+                    }
                 }
+
+                targets.forEach(t => {
+                    const nx = t.position.x + Math.cos(t.userData.dir) * t.userData.speed;
+                    const nz = t.position.z + Math.sin(t.userData.dir) * t.userData.speed;
+                    let hit = false;
+                    buildings.forEach(b => { if(nx > b.minX-0.2 && nx < b.maxX+0.2 && nz > b.minZ-0.2 && nz < b.maxZ+0.2) hit = true; });
+                    if(hit || Math.abs(nx)>70 || Math.abs(nz)>70) t.userData.dir += Math.PI * 0.65;
+                    else { t.position.x = nx; t.position.z = nz; t.rotation.y = -t.userData.dir + Math.PI/2; }
+                });
+
                 renderer.render(scene, camera);
             }
+
+            function gameOver(title, desc, color) {
+                if(!gameState.active) return;
+                gameState.active = false;
+                document.getElementById('msg-overlay').style.display = 'flex';
+                document.getElementById('msg-title').innerText = title;
+                document.getElementById('msg-title').style.color = color;
+                document.getElementById('msg-desc').innerText = desc;
+            }
+
             window.addEventListener('resize', () => {
-                const aspect = window.innerWidth / window.innerHeight;
-                camera.left = -d * aspect; camera.right = d * aspect;
-                camera.updateProjectionMatrix();
+                camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
                 renderer.setSize(window.innerWidth, window.innerHeight);
             });
             animate();
