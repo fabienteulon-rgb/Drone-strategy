@@ -87,7 +87,7 @@
                 SANTÉ
                 <div class="health-bar-container"><div id="health-fill"></div></div>
             </div>
-            <div class="hud-box">ALT: <span id="alt-val">10.0</span>m</div>
+            <div class="hud-box">ALT: <span id="alt-val">12.0</span>m</div>
         </div>
 
         <!-- Gemini Intel Module -->
@@ -129,36 +129,32 @@
 
     <script>
         // API CONFIGURATION
-        const apiKey = ""; // Provided by environment
+        const apiKey = ""; 
 
         async function geminiCall(prompt, isTTS = false) {
             try {
-                if (isTTS) {
-                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            contents: [{ parts: [{ text: `Say in a professional military AI voice: ${prompt}` }] }],
-                            generationConfig: { 
-                                responseModalities: ["AUDIO"],
-                                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Puck" } } } 
-                            }
-                        })
-                    });
-                    const result = await response.json();
-                    return result.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-                } else {
-                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            contents: [{ parts: [{ text: prompt }] }],
-                            systemInstruction: { parts: [{ text: "Tu es une IA de combat tactique nommée 'ARES'. Donne des rapports courts, froids et professionnels de maximum 15 mots en français." }] }
-                        })
-                    });
-                    const result = await response.json();
-                    return result.candidates?.[0]?.content?.parts?.[0]?.text;
-                }
+                const model = isTTS ? "gemini-2.5-flash-preview-tts" : "gemini-2.5-flash-preview-09-2025";
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${isTTS ? 'generateContent' : 'generateContent'}?key=${apiKey}`;
+                
+                const body = isTTS ? {
+                    contents: [{ parts: [{ text: `Say in a professional military AI voice: ${prompt}` }] }],
+                    generationConfig: { 
+                        responseModalities: ["AUDIO"],
+                        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Puck" } } } 
+                    }
+                } : {
+                    contents: [{ parts: [{ text: prompt }] }],
+                    systemInstruction: { parts: [{ text: "Tu es une IA de combat tactique nommée 'ARES'. Donne des rapports courts, froids et professionnels de maximum 15 mots en français." }] }
+                };
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                
+                const result = await response.json();
+                return isTTS ? result.candidates?.[0]?.content?.parts?.[0]?.inlineData : result.candidates?.[0]?.content?.parts?.[0]?.text;
             } catch (e) { return null; }
         }
 
@@ -168,8 +164,6 @@
             const arrayBuffer = new ArrayBuffer(audioData.length);
             const view = new Uint8Array(arrayBuffer);
             for (let i = 0; i < audioData.length; i++) view[i] = audioData.charCodeAt(i);
-            
-            // Minimal PCM to WAV conversion (Assumes 24kHz from Gemini TTS)
             const wavBuffer = createWavHeader(arrayBuffer, 24000);
             const blob = new Blob([wavBuffer], { type: 'audio/wav' });
             const url = URL.createObjectURL(blob);
@@ -181,18 +175,18 @@
             const header = new ArrayBuffer(44);
             const view = new DataView(header);
             const pcm = new Uint8Array(pcmData);
-            view.setUint32(0, 0x46464952, true); // "RIFF"
+            view.setUint32(0, 0x46464952, true); 
             view.setUint32(4, 36 + pcm.length, true);
-            view.setUint32(8, 0x45564157, true); // "WAVE"
-            view.setUint32(12, 0x20746d66, true); // "fmt "
+            view.setUint32(8, 0x45564157, true); 
+            view.setUint32(12, 0x20746d66, true); 
             view.setUint32(16, 16, true);
-            view.setUint16(20, 1, true); // PCM
-            view.setUint16(22, 1, true); // Mono
+            view.setUint16(20, 1, true); 
+            view.setUint16(22, 1, true); 
             view.setUint32(24, sampleRate, true);
             view.setUint32(28, sampleRate * 2, true);
             view.setUint16(32, 2, true);
             view.setUint16(34, 16, true);
-            view.setUint32(36, 0x61746164, true); // "data"
+            view.setUint32(36, 0x61746164, true); 
             view.setUint32(40, pcm.length, true);
             const combined = new Uint8Array(header.byteLength + pcm.length);
             combined.set(new Uint8Array(header), 0);
@@ -246,6 +240,28 @@
                         ctx.fillRect(x, y, 15, 18);
                     }
                 }
+                return new THREE.CanvasTexture(canvas);
+            },
+            buildingRoof: () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = 256; canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+                // Base
+                ctx.fillStyle = '#222'; ctx.fillRect(0,0,256,256);
+                // Bordure technique
+                ctx.strokeStyle = '#333'; ctx.lineWidth = 10; ctx.strokeRect(5,5,246,246);
+                // Grille de ventilation
+                ctx.fillStyle = '#111'; ctx.fillRect(40,40,60,60);
+                for(let i=0; i<60; i+=8) {
+                    ctx.strokeStyle = '#222'; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.moveTo(40, 40+i); ctx.lineTo(100, 40+i); ctx.stroke();
+                }
+                // Unité AC / Boitier technique
+                ctx.fillStyle = '#3a3a3a'; ctx.fillRect(150,140,40,50);
+                ctx.fillStyle = '#444'; ctx.fillRect(152,142,36,5);
+                // Marque au sol héliport ou technique
+                ctx.strokeStyle = 'rgba(255, 204, 0, 0.4)'; ctx.lineWidth = 4;
+                ctx.beginPath(); ctx.arc(128, 128, 80, 0, Math.PI*2); ctx.stroke();
                 return new THREE.CanvasTexture(canvas);
             }
         };
@@ -303,11 +319,24 @@
             floor.rotation.x = -Math.PI / 2; scene.add(floor);
 
             const sideTex = TextureGenerator.buildingSide();
+            const roofTex = TextureGenerator.buildingRoof();
+
             for(let i=0; i<15 + (lvl*2); i++) {
-                const w = 6 + Math.random()*8, h = 10 + Math.random()*30, d = 6 + Math.random()*8;
-                const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ map: sideTex }));
-                let px = (Math.random()-0.5) * 120;
-                let pz = (Math.random()-0.5) * 120;
+                const w = 8 + Math.random()*10, h = 10 + Math.random()*30, d = 8 + Math.random()*10;
+                
+                // Matériaux distincts pour les côtés et le toit
+                const materials = [
+                    new THREE.MeshStandardMaterial({ map: sideTex }), // +x
+                    new THREE.MeshStandardMaterial({ map: sideTex }), // -x
+                    new THREE.MeshStandardMaterial({ map: roofTex }), // +y (Roof)
+                    new THREE.MeshStandardMaterial({ map: sideTex }), // -y (Bottom)
+                    new THREE.MeshStandardMaterial({ map: sideTex }), // +z
+                    new THREE.MeshStandardMaterial({ map: sideTex })  // -z
+                ];
+
+                const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), materials);
+                let px = (Math.random()-0.5) * 140;
+                let pz = (Math.random()-0.5) * 140;
                 if(Math.abs(px) < 15 && Math.abs(pz) < 15) px += 30;
                 b.position.set(px, h/2, pz);
                 scene.add(b);
@@ -339,7 +368,6 @@
                 scene.add(s);
             }
             
-            // Welcome intel
             setTimeout(() => getTacticalAdvice(), 1500);
         }
 
@@ -438,7 +466,9 @@
             const fill = document.getElementById('health-fill');
             fill.style.width = `${Math.max(0, gameState.health)}%`;
             fill.style.background = gameState.health < 30 ? "#ff3300" : "#00ffcc";
-            document.getElementById('alt-val').innerText = gameState.altitude.toFixed(1);
+            // Correction de l'affichage de l'altitude
+            const altText = document.getElementById('alt-val');
+            if (altText) altText.innerText = gameState.altitude.toFixed(1);
         }
 
         function animate() {
@@ -449,7 +479,7 @@
             if(keys.a) mx = -1; if(keys.d) mx = 1;
             if(keys.w) my = -1; if(keys.s) my = 1;
             
-            gameState.altitude = THREE.MathUtils.clamp(gameState.altitude + (keys.shift ? 0.15 : (keys.ctrl ? -0.15 : 0)), 2, 80);
+            gameState.altitude = THREE.MathUtils.clamp(gameState.altitude + (keys.shift ? 0.25 : (keys.ctrl ? -0.25 : 0)), 1, 100);
             drone.position.y = gameState.altitude;
 
             const forward = new THREE.Vector3();
@@ -466,8 +496,9 @@
 
             updatePrecision();
             checkCollisions();
+            updateUI(); // Assurer la mise à jour constante du HUD
 
-            rotors.forEach(r => r.rotation.y += 0.8);
+            rotors.forEach(r => r.rotation.y += 1.2);
             drone.rotation.z = THREE.MathUtils.lerp(drone.rotation.z, -mx * 0.15, 0.1);
             drone.rotation.x = THREE.MathUtils.lerp(drone.rotation.x, -my * 0.15, 0.1);
 
@@ -479,7 +510,7 @@
             areaCircle.material.color.set(gameState.precisionFactor < 0.1 ? 0x00ffcc : 0xff3300);
 
             gameState.camAngle = THREE.MathUtils.lerp(gameState.camAngle, gameState.camTargetAngle, 0.1);
-            const camDist = 20 + (gameState.altitude * 0.5);
+            const camDist = 20 + (gameState.altitude * 0.4);
             mainCamera.position.set(
                 drone.position.x + Math.cos(gameState.camAngle) * camDist,
                 drone.position.y + 15,
@@ -501,7 +532,8 @@
                     targets.forEach((t, idx) => {
                         if(t.position.distanceTo(new THREE.Vector3(b.mesh.position.x, 0, b.mesh.position.z)) < 3.5) {
                             scene.remove(t); targets.splice(idx, 1);
-                            gameState.targetsLeft--; document.getElementById('targets').innerText = gameState.targetsLeft;
+                            gameState.targetsLeft--; 
+                            document.getElementById('targets').innerText = gameState.targetsLeft;
                         }
                     });
                     scene.remove(b.mesh); bombs.splice(i, 1);
@@ -543,16 +575,11 @@
             document.getElementById('msg-title').innerText = title;
             document.getElementById('msg-title').style.color = color;
             document.getElementById('msg-desc').innerText = desc;
-            
-            // AI Analysis of the end game
             getTacticalAdvice();
-            
             const btn = document.getElementById('next-btn');
             btn.innerText = success ? "MISSION SUIVANTE" : "RÉESSAYER";
             btn.onclick = () => { 
-                if(success) {
-                    currentLevel++; 
-                }
+                if(success) currentLevel++; 
                 setupLevel(currentLevel); 
             };
         }
