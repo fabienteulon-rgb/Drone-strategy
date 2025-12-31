@@ -6,76 +6,229 @@
     <meta name="theme-color" content="#121212">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Drone Strike Ops - Tactical AI</title>
+    <title>Drone Strike Ops - Tactical Intelligence Update</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         body { margin: 0; overflow: hidden; background: #050505; font-family: 'Courier New', Courier, monospace; touch-action: none; user-select: none; -webkit-user-select: none; }
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
         #ui-layer::after { content: " "; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.05) 50%); background-size: 100% 3px; pointer-events: none; }
 
-        .hud-top { position: absolute; top: 15px; left: 15px; right: 15px; display: flex; justify-content: space-between; color: #00ffcc; text-shadow: 0 0 10px #00ffcc; font-weight: bold; font-size: 12px; pointer-events: none; }
-        .hud-box { background: rgba(0, 20, 10, 0.8); padding: 8px 12px; border: 1px solid #00ffcc; border-radius: 2px; }
+        .hud-top { position: absolute; top: 15px; left: 15px; display: flex; flex-direction: column; gap: 10px; color: #00ffcc; text-shadow: 0 0 10px #00ffcc; font-weight: bold; font-size: 12px; pointer-events: none; }
+        .hud-box { background: rgba(0, 20, 10, 0.8); padding: 8px 12px; border: 1px solid #00ffcc; border-radius: 2px; min-width: 120px; }
+        .health-bar-container { width: 100%; height: 10px; border: 1px solid #00ffcc; margin-top: 5px; background: rgba(0,0,0,0.5); position: relative; }
+        #health-fill { width: 100%; height: 100%; background: #00ffcc; transition: width 0.3s; }
         
-        .controls-area { position: absolute; bottom: 30px; width: 100%; display: flex; justify-content: space-between; align-items: flex-end; padding: 0 20px; box-sizing: border-box; pointer-events: none; }
+        /* Tactical Intelligence HUD */
+        #intel-module {
+            position: absolute; bottom: 170px; left: 15px; width: 220px;
+            background: rgba(0, 15, 5, 0.9); border-left: 3px solid #00ffcc;
+            padding: 10px; color: #00ffcc; font-size: 10px; pointer-events: auto;
+            max-height: 100px; overflow-y: auto; text-transform: uppercase;
+        }
+        .intel-title { font-weight: 900; margin-bottom: 5px; display: flex; justify-content: space-between; }
+        .intel-btn { background: #00ffcc; color: #000; border: none; font-size: 9px; cursor: pointer; padding: 2px 5px; font-weight: bold; }
+
+        #aim-camera-container {
+            position: absolute; top: 15px; right: 15px; width: 160px; height: 160px;
+            border: 2px solid #00ffcc; border-radius: 4px; overflow: hidden; pointer-events: none;
+            box-shadow: 0 0 15px rgba(0, 255, 204, 0.3); background: transparent;
+        }
+        #aim-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center; z-index: 5;
+        }
+        .aim-crosshair {
+            width: 80px; height: 80px; border: 1px solid rgba(255, 51, 0, 0.8);
+            border-radius: 50%; position: relative; transition: all 0.1s;
+        }
+        .aim-crosshair::before, .aim-crosshair::after {
+            content: ''; position: absolute; background: rgba(255, 51, 0, 0.8);
+        }
+        .aim-crosshair::before { width: 100%; height: 1px; top: 50%; left: 0; }
+        .aim-crosshair::after { height: 100%; width: 1px; left: 50%; top: 0; }
+
+        /* Controls Area */
+        .controls-area { position: absolute; bottom: 30px; left: 0; width: 100%; display: flex; justify-content: space-between; align-items: flex-end; padding: 0 20px; box-sizing: border-box; pointer-events: none; }
         #joystick-zone { width: 120px; height: 120px; position: relative; pointer-events: auto; }
         .joystick-base { width: 100%; height: 100%; background: rgba(0, 255, 204, 0.05); border: 2px solid rgba(0,255,204,0.3); border-radius: 50%; position: absolute; }
         .joystick-stick { width: 50px; height: 50px; background: #fff; border-radius: 50%; position: absolute; top: 35px; left: 35px; box-shadow: 0 0 15px #fff; pointer-events: none; }
 
-        #action-zone { pointer-events: auto; display: flex; flex-direction: column; gap: 15px; align-items: center; }
-        .btn-action { width: 65px; height: 65px; border-radius: 50%; border: 2px solid #fff; background: rgba(255, 255, 255, 0.1); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px; cursor: pointer; }
-        .btn-fire { width: 95px; height: 95px; border-color: #ff3300; color: #ff3300; background: rgba(255, 51, 0, 0.2); box-shadow: 0 0 20px rgba(255, 51, 0, 0.4); font-size: 18px; font-weight: 900; }
+        #action-zone { pointer-events: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: center; }
+        .btn-action { width: 65px; height: 65px; border-radius: 50%; border: 2px solid #fff; background: rgba(255, 255, 255, 0.1); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 9px; cursor: pointer; }
+        .btn-fire { grid-row: span 2; width: 90px; height: 90px; border-color: #ff3300; color: #ff3300; background: rgba(255, 51, 0, 0.2); box-shadow: 0 0 20px rgba(255, 51, 0, 0.4); font-size: 16px; font-weight: 900; }
 
-        #view-zone { position: absolute; top: 15%; left: 15%; width: 70%; height: 55%; pointer-events: auto; z-index: 1; }
+        #view-zone { position: absolute; top: 20%; left: 20%; width: 60%; height: 60%; pointer-events: auto; z-index: 1; }
 
         #msg-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 20; pointer-events: auto; }
         .msg-content { border: 2px solid #00ffcc; padding: 30px; background: #0a0a0a; color: #00ffcc; text-align: center; max-width: 80%; }
         .restart-btn { margin-top: 20px; padding: 15px 30px; background: #00ffcc; border: none; font-weight: bold; color: black; cursor: pointer; text-transform: uppercase; }
+
+        #damage-flash { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 0, 0, 0.4); display: none; pointer-events: none; z-index: 10; }
+        #collision-warning { color: #ff3300; font-weight: bold; text-align: center; display: none; position: absolute; width: 100%; top: 40%; pointer-events: none; z-index: 15; }
+        
+        #precision-meter { position: absolute; top: 180px; right: 15px; width: 160px; color: #00ffcc; font-size: 10px; text-align: center; pointer-events: none; }
+        .loading-intel { animation: blink 1s infinite; }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
 
     <div id="view-zone"></div>
+    <div id="damage-flash"></div>
+    <div id="collision-warning">ALERTE COLLISION</div>
 
     <div id="ui-layer">
         <div class="hud-top">
-            <div class="hud-box">LVL: <span id="level-val">1</span></div>
-            <div class="hud-box">ALT: <span id="alt-val">6.0</span>m</div>
-            <div class="hud-box">OBJ: <span id="targets">0</span></div>
+            <div class="hud-box">
+                NIVEAU <span id="level-val">1</span><br>
+                OBJ: <span id="targets">0</span>
+            </div>
+            <div class="hud-box">
+                SANTÉ
+                <div class="health-bar-container"><div id="health-fill"></div></div>
+            </div>
+            <div class="hud-box">ALT: <span id="alt-val">10.0</span>m</div>
+        </div>
+
+        <!-- Gemini Intel Module -->
+        <div id="intel-module">
+            <div class="intel-title">
+                RENS. TACTIQUE ✨
+                <button class="intel-btn" onclick="getTacticalAdvice()">MAJ ✨</button>
+            </div>
+            <div id="intel-text">Initialisation du flux satellite...</div>
         </div>
         
+        <div id="aim-camera-container">
+            <div id="aim-overlay">
+                <div class="aim-crosshair" id="crosshair"></div>
+            </div>
+        </div>
+        <div id="precision-meter">STABILISATION...</div>
+
         <div class="controls-area">
             <div id="joystick-zone">
                 <div class="joystick-base"></div>
                 <div class="joystick-stick" id="stick"></div>
             </div>
             <div id="action-zone">
-                <div class="btn-action" id="btn-up">MONTER</div>
                 <div class="btn-action btn-fire" id="btn-fire">FEU</div>
-                <div class="btn-action" id="btn-down">BAISSER</div>
+                <div class="btn-action" id="btn-up">↑</div>
+                <div class="btn-action" id="btn-down">↓</div>
             </div>
         </div>
     </div>
 
     <div id="msg-overlay">
         <div class="msg-content">
-            <h1 id="msg-title">MISSION ACCOMPLIE</h1>
-            <p id="msg-desc">Secteur sécurisé. Déploiement vers la zone suivante.</p>
-            <button id="next-btn" class="restart-btn">NIVEAU SUIVANT</button>
+            <h1 id="msg-title">MISSION TERMINÉE</h1>
+            <p id="msg-desc">Analyse des résultats...</p>
+            <button id="next-btn" class="restart-btn">SUIVANT</button>
         </div>
     </div>
 
     <script>
+        // API CONFIGURATION
+        const apiKey = ""; // Provided by environment
+
+        async function geminiCall(prompt, isTTS = false) {
+            try {
+                if (isTTS) {
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: `Say in a professional military AI voice: ${prompt}` }] }],
+                            generationConfig: { 
+                                responseModalities: ["AUDIO"],
+                                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Puck" } } } 
+                            }
+                        })
+                    });
+                    const result = await response.json();
+                    return result.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+                } else {
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: prompt }] }],
+                            systemInstruction: { parts: [{ text: "Tu es une IA de combat tactique nommée 'ARES'. Donne des rapports courts, froids et professionnels de maximum 15 mots en français." }] }
+                        })
+                    });
+                    const result = await response.json();
+                    return result.candidates?.[0]?.content?.parts?.[0]?.text;
+                }
+            } catch (e) { return null; }
+        }
+
+        async function playAudio(inlineData) {
+            if (!inlineData) return;
+            const audioData = atob(inlineData.data);
+            const arrayBuffer = new ArrayBuffer(audioData.length);
+            const view = new Uint8Array(arrayBuffer);
+            for (let i = 0; i < audioData.length; i++) view[i] = audioData.charCodeAt(i);
+            
+            // Minimal PCM to WAV conversion (Assumes 24kHz from Gemini TTS)
+            const wavBuffer = createWavHeader(arrayBuffer, 24000);
+            const blob = new Blob([wavBuffer], { type: 'audio/wav' });
+            const url = URL.createObjectURL(blob);
+            const audio = new Audio(url);
+            audio.play();
+        }
+
+        function createWavHeader(pcmData, sampleRate) {
+            const header = new ArrayBuffer(44);
+            const view = new DataView(header);
+            const pcm = new Uint8Array(pcmData);
+            view.setUint32(0, 0x46464952, true); // "RIFF"
+            view.setUint32(4, 36 + pcm.length, true);
+            view.setUint32(8, 0x45564157, true); // "WAVE"
+            view.setUint32(12, 0x20746d66, true); // "fmt "
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true); // PCM
+            view.setUint16(22, 1, true); // Mono
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            view.setUint32(36, 0x61746164, true); // "data"
+            view.setUint32(40, pcm.length, true);
+            const combined = new Uint8Array(header.byteLength + pcm.length);
+            combined.set(new Uint8Array(header), 0);
+            combined.set(pcm, 44);
+            return combined.buffer;
+        }
+
+        async function getTacticalAdvice() {
+            const intelText = document.getElementById('intel-text');
+            intelText.classList.add('loading-intel');
+            intelText.innerText = "Synchronisation...";
+
+            const prompt = `Statut actuel : Niveau ${currentLevel}, Santé ${gameState.health}%, Cibles restantes ${gameState.targetsLeft}, Altitude ${gameState.altitude.toFixed(1)}m. Donne un ordre tactique.`;
+            
+            const advice = await geminiCall(prompt);
+            if (advice) {
+                intelText.innerText = advice;
+                intelText.classList.remove('loading-intel');
+                const ttsData = await geminiCall(advice, true);
+                if (ttsData) playAudio(ttsData);
+            } else {
+                intelText.innerText = "Liaison satellite interrompue.";
+            }
+        }
+
         const TextureGenerator = {
             ground: () => {
                 const canvas = document.createElement('canvas');
                 canvas.width = canvas.height = 512;
                 const ctx = canvas.getContext('2d');
-                ctx.fillStyle = '#1a2414';
+                ctx.fillStyle = '#1a1d18';
                 ctx.fillRect(0,0,512,512);
                 for(let i=0; i<400; i++) {
-                    ctx.fillStyle = ['#2d3b24', '#3d3423', '#1d2b14'][Math.floor(Math.random()*3)];
+                    ctx.fillStyle = ['#232b1e', '#2c271e', '#161d12', '#0a0a0a'][Math.floor(Math.random()*4)];
                     ctx.globalAlpha = 0.3;
-                    ctx.beginPath(); ctx.arc(Math.random()*512, Math.random()*512, Math.random()*60+10, 0, Math.PI*2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(Math.random()*512, Math.random()*512, Math.random()*40+2, 0, Math.PI*2); ctx.fill();
                 }
                 const tex = new THREE.CanvasTexture(canvas);
                 tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
@@ -86,35 +239,28 @@
                 const canvas = document.createElement('canvas');
                 canvas.width = 128; canvas.height = 256;
                 const ctx = canvas.getContext('2d');
-                ctx.fillStyle = '#222'; ctx.fillRect(0,0,128,256);
-                for(let y=20; y<240; y+=30) {
-                    for(let x=15; x<110; x+=25) {
-                        ctx.fillStyle = Math.random() > 0.8 ? '#ffcc00' : '#111';
-                        ctx.fillRect(x, y, 12, 18);
+                ctx.fillStyle = '#1a1a1a'; ctx.fillRect(0,0,128,256);
+                for(let y=10; y<240; y+=30) {
+                    for(let x=10; x<110; x+=25) {
+                        ctx.fillStyle = Math.random() > 0.85 ? '#ffcc00' : '#050505';
+                        ctx.fillRect(x, y, 15, 18);
                     }
                 }
-                return new THREE.CanvasTexture(canvas);
-            },
-            buildingTop: () => {
-                const canvas = document.createElement('canvas');
-                canvas.width = canvas.height = 128;
-                const ctx = canvas.getContext('2d');
-                ctx.fillStyle = '#333'; ctx.fillRect(0,0,128,128);
-                ctx.strokeStyle = '#444'; ctx.lineWidth = 4;
-                ctx.strokeRect(10,10,108,108);
-                ctx.fillStyle = '#222'; ctx.fillRect(40,40,48,48);
                 return new THREE.CanvasTexture(canvas);
             }
         };
 
         let currentLevel = 1;
-        const SETTINGS = { speed: 0.2, inertia: 0.88, camSmooth: 0.08 };
+        const SETTINGS = { speed: 0.25, inertia: 0.9, droneSize: 0.8 };
         let gameState = { 
             active: true, targetsLeft: 0, velocity: { x: 0, z: 0 }, input: { x: 0, y: 0 }, 
-            altitude: 8.0, camAngle: Math.PI / 4, camTargetAngle: Math.PI / 4 
+            altitude: 12.0, camAngle: Math.PI / 4, camTargetAngle: Math.PI / 4,
+            health: 100, collisionCooldown: 0,
+            velocityHistory: [], 
+            precisionFactor: 1.0 
         };
 
-        let scene, camera, renderer, drone, reticle, targets = [], buildings = [], rotors = [], bombs = [];
+        let scene, mainCamera, aimCamera, renderer, drone, areaCircle, targets = [], buildings = [], rotors = [], bombs = [];
         const keys = { w: false, s: false, a: false, d: false, shift: false, ctrl: false };
 
         function setupLevel(lvl) {
@@ -123,241 +269,272 @@
                 targets = []; buildings = []; rotors = []; bombs = [];
             } else {
                 scene = new THREE.Scene();
-                renderer = new THREE.WebGLRenderer({ antialias: true });
+                renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                renderer.setPixelRatio(window.devicePixelRatio);
                 renderer.setSize(window.innerWidth, window.innerHeight);
-                renderer.shadowMap.enabled = true;
+                renderer.autoClear = false;
                 document.body.appendChild(renderer.domElement);
             }
 
             gameState.active = true;
-            gameState.targetsLeft = 4 + Math.floor(lvl * 1.5);
+            gameState.health = 100;
+            gameState.altitude = 12.0;
+            gameState.velocity = {x:0, z:0};
+            gameState.velocityHistory = [];
+            updateUI();
+            
+            gameState.targetsLeft = 3 + Math.floor(lvl * 1.5);
             document.getElementById('level-val').innerText = lvl;
             document.getElementById('targets').innerText = gameState.targetsLeft;
             document.getElementById('msg-overlay').style.display = 'none';
 
-            scene.background = new THREE.Color(0x0a0f12);
-            scene.fog = new THREE.Fog(0x0a0f12, 50, 180);
+            scene.background = new THREE.Color(0x05070a);
+            scene.fog = new THREE.Fog(0x05070a, 50, 250);
             
-            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-            scene.add(new THREE.AmbientLight(0xffffff, 0.3));
-            const sun = new THREE.DirectionalLight(0xffffff, 0.8);
-            sun.position.set(30, 60, 20);
-            sun.castShadow = true;
-            sun.shadow.mapSize.width = 2048;
+            mainCamera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            aimCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
+
+            scene.add(new THREE.AmbientLight(0x555555));
+            const sun = new THREE.DirectionalLight(0xffffff, 0.7);
+            sun.position.set(50, 100, 50);
             scene.add(sun);
 
-            // Taille de la zone de jeu progressive
-            const floorRange = 60 + (lvl * 8);
-            const floor = new THREE.Mesh(new THREE.PlaneGeometry(floorRange * 2, floorRange * 2), new THREE.MeshStandardMaterial({ map: TextureGenerator.ground() }));
-            floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+            const floor = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), new THREE.MeshStandardMaterial({ map: TextureGenerator.ground() }));
+            floor.rotation.x = -Math.PI / 2; scene.add(floor);
 
-            // Bâtiments
-            const buildingCount = 4 + (lvl * 2);
             const sideTex = TextureGenerator.buildingSide();
-            const topTex = TextureGenerator.buildingTop();
-            
-            for(let i=0; i<buildingCount; i++) {
-                const w = 5 + Math.random()*5, h = 8 + Math.random()*15, d = 5 + Math.random()*5;
-                const materials = [
-                    new THREE.MeshStandardMaterial({ map: sideTex }),
-                    new THREE.MeshStandardMaterial({ map: sideTex }),
-                    new THREE.MeshStandardMaterial({ map: topTex }), 
-                    new THREE.MeshStandardMaterial({ color: 0x111 }),
-                    new THREE.MeshStandardMaterial({ map: sideTex }),
-                    new THREE.MeshStandardMaterial({ map: sideTex })
-                ];
-                const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), materials);
-                
-                const spawnRadius = 30 + (lvl * 4);
-                let px = (Math.random()-0.5) * spawnRadius * 2;
-                let pz = (Math.random()-0.5) * spawnRadius * 2;
-                if(Math.abs(px) < 12 && Math.abs(pz) < 12) px += 25;
-
+            for(let i=0; i<15 + (lvl*2); i++) {
+                const w = 6 + Math.random()*8, h = 10 + Math.random()*30, d = 6 + Math.random()*8;
+                const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ map: sideTex }));
+                let px = (Math.random()-0.5) * 120;
+                let pz = (Math.random()-0.5) * 120;
+                if(Math.abs(px) < 15 && Math.abs(pz) < 15) px += 30;
                 b.position.set(px, h/2, pz);
-                b.castShadow = b.receiveShadow = true;
                 scene.add(b);
-                buildings.push({minX: px-w/2, maxX: px+w/2, minZ: pz-d/2, maxZ: pz+d/2, topY: h});
+                buildings.push({
+                    minX: px - w/2 - SETTINGS.droneSize,
+                    maxX: px + w/2 + SETTINGS.droneSize,
+                    minZ: pz - d/2 - SETTINGS.droneSize,
+                    maxZ: pz + d/2 + SETTINGS.droneSize,
+                    height: h
+                });
             }
 
-            // Drone
             drone = createDrone();
             drone.position.set(0, gameState.altitude, 0);
             scene.add(drone);
 
-            reticle = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.6, 32), new THREE.MeshBasicMaterial({ color: 0xff3300, transparent: true, opacity: 0.6 }));
-            reticle.rotation.x = -Math.PI / 2;
-            scene.add(reticle);
+            areaCircle = new THREE.Mesh(
+                new THREE.RingGeometry(1, 1.15, 32), 
+                new THREE.MeshBasicMaterial({ color: 0xff3300, transparent: true, opacity: 0.6, side: THREE.DoubleSide })
+            );
+            areaCircle.rotation.x = -Math.PI / 2;
+            scene.add(areaCircle);
 
-            // Ennemis (Design réaliste)
             for(let i=0; i<gameState.targetsLeft; i++) {
-                const soldier = createSoldier();
-                const range = 40 + (lvl * 6);
-                soldier.position.set((Math.random()-0.5)*range*2, 0, (Math.random()-0.5)*range*2);
-                
-                // IA: Faction (statique) ou Patrouille (mobile)
-                const isFaction = Math.random() > 0.6;
-                soldier.userData = { 
-                    type: isFaction ? 'faction' : 'patrol',
-                    speed: 0.03 + (lvl * 0.003),
-                    angle: Math.random() * Math.PI * 2,
-                    targetAngle: Math.random() * Math.PI * 2,
-                    nextDecision: Date.now() + Math.random() * 3000
-                };
-                
-                targets.push(soldier);
-                scene.add(soldier);
+                const s = createSoldier();
+                s.position.set((Math.random()-0.5)*100, 0, (Math.random()-0.5)*100);
+                s.userData = { lastShoot: 0 };
+                targets.push(s);
+                scene.add(s);
             }
+            
+            // Welcome intel
+            setTimeout(() => getTacticalAdvice(), 1500);
         }
 
         function createSoldier() {
-            const group = new THREE.Group();
-            const matUniform = new THREE.MeshStandardMaterial({ color: 0x2d3b24 }); // Vert kaki
-            const matSkin = new THREE.MeshStandardMaterial({ color: 0xd2b48c }); // Chair
-            const matGear = new THREE.MeshStandardMaterial({ color: 0x111111 }); // Noir équipement
-
-            // Corps
-            const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.15, 0.6, 6), matUniform);
-            body.position.y = 0.5; group.add(body);
-            // Tête
-            const head = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), matSkin);
-            head.position.y = 0.9; group.add(head);
-            // Casque
-            const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 8, 0, Math.PI*2, 0, Math.PI/2), matGear);
-            helmet.position.y = 0.92; group.add(helmet);
-            // Bras/Arme
-            const gun = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.4), matGear);
-            gun.position.set(0.15, 0.6, 0.2); group.add(gun);
-
-            group.castShadow = true;
-            return group;
+            const g = new THREE.Group();
+            const b = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.8), new THREE.MeshStandardMaterial({color: 0x223322}));
+            b.position.y = 0.4; g.add(b);
+            const h = new THREE.Mesh(new THREE.SphereGeometry(0.15), new THREE.MeshStandardMaterial({color: 0xd2b48c}));
+            h.position.y = 0.9; g.add(h);
+            return g;
         }
 
         function createDrone() {
-            const group = new THREE.Group();
-            const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.2, 0.8), new THREE.MeshStandardMaterial({ color: 0xffffff }));
-            group.add(body);
-            const rotorMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.6 });
-            const pos = [[0.65, 0.45], [0.65, -0.45], [-0.65, 0.45], [-0.65, -0.45]];
-            pos.forEach((p, i) => {
-                const r = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.01, 16), rotorMat);
-                r.position.set(p[0], 0.1, p[1]); group.add(r); rotors.push(r);
-                const led = new THREE.PointLight(i<2?0xff0000:0x00ff00, 1.5, 3);
-                led.position.set(p[0], -0.1, p[1]); group.add(led);
+            const g = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.15, 1), new THREE.MeshStandardMaterial({ color: 0x444444 }));
+            g.add(body);
+            const cam = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.2, 0.3), new THREE.MeshStandardMaterial({color: 0x000000}));
+            cam.position.y = -0.15; g.add(cam);
+
+            const rMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.3 });
+            [[0.6,0.5], [0.6,-0.5], [-0.6,0.5], [-0.6,-0.5]].forEach(p => {
+                const r = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.01), rMat);
+                r.position.set(p[0], 0.1, p[1]); g.add(r); rotors.push(r);
             });
-            return group;
+            return g;
+        }
+
+        function updatePrecision() {
+            const instSpeed = Math.sqrt(gameState.velocity.x**2 + gameState.velocity.z**2);
+            gameState.velocityHistory.push(instSpeed);
+            if(gameState.velocityHistory.length > 180) gameState.velocityHistory.shift();
+            const avgSpeed = gameState.velocityHistory.reduce((a,b) => a+b, 0) / gameState.velocityHistory.length;
+            const rawFactor = (instSpeed * 2.0) + (avgSpeed * 5.0);
+            gameState.precisionFactor = THREE.MathUtils.clamp(rawFactor, 0, 1);
+            
+            const ch = document.getElementById('crosshair');
+            const size = 30 + (gameState.precisionFactor * 70);
+            ch.style.width = ch.style.height = `${size}px`;
+            
+            const meter = document.getElementById('precision-meter');
+            const perc = Math.round((1 - gameState.precisionFactor) * 100);
+            meter.innerText = perc > 95 ? "VERROUILLAGE OK" : `STABILISATION: ${perc}%`;
+            meter.style.color = perc > 95 ? "#00ffcc" : "#ff9900";
+        }
+
+        function checkCollisions() {
+            if (gameState.collisionCooldown > 0) {
+                gameState.collisionCooldown--;
+                return;
+            }
+            for (let b of buildings) {
+                if (drone.position.x > b.minX && drone.position.x < b.maxX &&
+                    drone.position.z > b.minZ && drone.position.z < b.maxZ &&
+                    drone.position.y < b.height) {
+                    
+                    takeDamage(75);
+                    gameState.collisionCooldown = 60;
+                    gameState.velocity.x *= -1.2;
+                    gameState.velocity.z *= -1.2;
+                    
+                    document.getElementById('collision-warning').style.display = 'block';
+                    setTimeout(() => document.getElementById('collision-warning').style.display = 'none', 1000);
+                    break;
+                }
+            }
         }
 
         function fire() {
             if(!gameState.active) return;
-            const b = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 8), new THREE.MeshBasicMaterial({color: 0xffaa00}));
+            const b = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 8), new THREE.MeshBasicMaterial({color: 0xff4400}));
             b.position.copy(drone.position);
             scene.add(b);
-            bombs.push({mesh: b, vy: 0});
+            
+            const dispersion = gameState.precisionFactor * 4.0;
+            const offsetX = (Math.random()-0.5) * dispersion;
+            const offsetZ = (Math.random()-0.5) * dispersion;
+
+            bombs.push({ 
+                mesh: b, 
+                vy: 0, 
+                targetX: drone.position.x + offsetX, 
+                targetZ: drone.position.z + offsetZ 
+            });
+        }
+
+        function takeDamage(amount) {
+            gameState.health -= amount;
+            updateUI();
+            const flash = document.getElementById('damage-flash');
+            flash.style.display = 'block';
+            setTimeout(() => flash.style.display = 'none', 100);
+            if(gameState.health <= 0) gameOver("DRONE PERDU", "Collision ou destruction ennemie.", "#ff3300", false);
+        }
+
+        function updateUI() {
+            const fill = document.getElementById('health-fill');
+            fill.style.width = `${Math.max(0, gameState.health)}%`;
+            fill.style.background = gameState.health < 30 ? "#ff3300" : "#00ffcc";
+            document.getElementById('alt-val').innerText = gameState.altitude.toFixed(1);
         }
 
         function animate() {
             requestAnimationFrame(animate);
             if(!gameState.active) return;
 
-            // Inputs
             let mx = gameState.input.x; let my = gameState.input.y;
             if(keys.a) mx = -1; if(keys.d) mx = 1;
             if(keys.w) my = -1; if(keys.s) my = 1;
             
-            gameState.altitude = THREE.MathUtils.clamp(gameState.altitude + (keys.shift ? 0.1 : (keys.ctrl ? -0.1 : 0)), 3, 50);
+            gameState.altitude = THREE.MathUtils.clamp(gameState.altitude + (keys.shift ? 0.15 : (keys.ctrl ? -0.15 : 0)), 2, 80);
             drone.position.y = gameState.altitude;
-            document.getElementById('alt-val').innerText = gameState.altitude.toFixed(1);
 
-            // Mouvement relatif caméra
             const forward = new THREE.Vector3();
-            camera.getWorldDirection(forward);
+            mainCamera.getWorldDirection(forward);
             forward.y = 0; forward.normalize();
-            const right = new THREE.Vector3();
-            right.crossVectors(forward, camera.up);
+            const right = new THREE.Vector3().crossVectors(forward, mainCamera.up);
             
-            const moveDir = new THREE.Vector3();
-            moveDir.addScaledVector(forward, -my);
-            moveDir.addScaledVector(right, mx);
-            
-            gameState.velocity.x = (gameState.velocity.x + moveDir.x * SETTINGS.speed * 0.12) * SETTINGS.inertia;
-            gameState.velocity.z = (gameState.velocity.z + moveDir.z * SETTINGS.speed * 0.12) * SETTINGS.inertia;
+            const moveDir = new THREE.Vector3().addScaledVector(forward, -my).addScaledVector(right, mx);
+            gameState.velocity.x = (gameState.velocity.x + moveDir.x * SETTINGS.speed * 0.1) * SETTINGS.inertia;
+            gameState.velocity.z = (gameState.velocity.z + moveDir.z * SETTINGS.speed * 0.1) * SETTINGS.inertia;
             
             drone.position.x += gameState.velocity.x;
             drone.position.z += gameState.velocity.z;
 
-            // Collisions
-            buildings.forEach(b => {
-                if (drone.position.x > b.minX-0.6 && drone.position.x < b.maxX+0.6 &&
-                    drone.position.z > b.minZ-0.6 && drone.position.z < b.maxZ+0.6 &&
-                    drone.position.y < b.topY + 0.5) {
-                    gameOver("DRONE PERDU", "Collision avec une structure", "#ff3300", false);
-                }
-            });
+            updatePrecision();
+            checkCollisions();
 
-            // Visuel Drone
             rotors.forEach(r => r.rotation.y += 0.8);
-            if (moveDir.length() > 0.05) {
-                const targetRotY = Math.atan2(moveDir.x, moveDir.z);
-                drone.rotation.y = THREE.MathUtils.lerp(drone.rotation.y, targetRotY, 0.1);
-            }
-            drone.rotation.z = THREE.MathUtils.lerp(drone.rotation.z, -mx * 0.45, 0.1);
-            drone.rotation.x = THREE.MathUtils.lerp(drone.rotation.x, -my * 0.45, 0.1);
+            drone.rotation.z = THREE.MathUtils.lerp(drone.rotation.z, -mx * 0.15, 0.1);
+            drone.rotation.x = THREE.MathUtils.lerp(drone.rotation.x, -my * 0.15, 0.1);
 
-            reticle.position.set(drone.position.x, 0.1, drone.position.z);
+            areaCircle.position.set(drone.position.x, 0.1, drone.position.z);
+            const baseScale = 1 + (gameState.altitude * 0.25);
+            const precisionScale = 0.5 + (gameState.precisionFactor * 2.0); 
+            const finalScale = baseScale * precisionScale;
+            areaCircle.scale.set(finalScale, finalScale, 1);
+            areaCircle.material.color.set(gameState.precisionFactor < 0.1 ? 0x00ffcc : 0xff3300);
 
-            // Caméra
             gameState.camAngle = THREE.MathUtils.lerp(gameState.camAngle, gameState.camTargetAngle, 0.1);
-            const camDist = 20 + (gameState.altitude * 0.6);
-            camera.position.lerp(new THREE.Vector3(
+            const camDist = 20 + (gameState.altitude * 0.5);
+            mainCamera.position.set(
                 drone.position.x + Math.cos(gameState.camAngle) * camDist,
-                gameState.altitude + 20,
+                drone.position.y + 15,
                 drone.position.z + Math.sin(gameState.camAngle) * camDist
-            ), SETTINGS.camSmooth);
-            camera.lookAt(drone.position.x, 0, drone.position.z);
+            );
+            mainCamera.lookAt(drone.position.x, drone.position.y - 5, drone.position.z);
 
-            // Bombes
+            aimCamera.position.set(drone.position.x, drone.position.y - 0.2, drone.position.z);
+            aimCamera.lookAt(drone.position.x, 0, drone.position.z);
+
             for(let i=bombs.length-1; i>=0; i--) {
-                bombs[i].vy -= 0.025; bombs[i].mesh.position.y += bombs[i].vy;
-                if(bombs[i].mesh.position.y <= 0) {
-                    const p = bombs[i].mesh.position;
+                const b = bombs[i];
+                b.vy -= 0.05;
+                b.mesh.position.y += b.vy;
+                b.mesh.position.x = THREE.MathUtils.lerp(b.mesh.position.x, b.targetX, 0.05);
+                b.mesh.position.z = THREE.MathUtils.lerp(b.mesh.position.z, b.targetZ, 0.05);
+
+                if(b.mesh.position.y <= 0) {
                     targets.forEach((t, idx) => {
-                        if(t.position.distanceTo(p) < 4.5) {
+                        if(t.position.distanceTo(new THREE.Vector3(b.mesh.position.x, 0, b.mesh.position.z)) < 3.5) {
                             scene.remove(t); targets.splice(idx, 1);
                             gameState.targetsLeft--; document.getElementById('targets').innerText = gameState.targetsLeft;
                         }
                     });
-                    scene.remove(bombs[i].mesh); bombs.splice(i, 1);
-                    if(gameState.targetsLeft === 0) gameOver("NIVEAU RÉUSSI", "Zone suivante débloquée", "#00ffcc", true);
+                    scene.remove(b.mesh); bombs.splice(i, 1);
+                    if(gameState.targetsLeft === 0) gameOver("MISSION RÉUSSIE", "Zone nettoyée avec précision.", "#00ffcc", true);
                 }
             }
 
-            // IA Soldats
+            const now = Date.now();
             targets.forEach(t => {
-                const data = t.userData;
-                const now = Date.now();
-
-                if (data.type === 'patrol') {
-                    // Gravite vers le centre avec un peu de bruit
-                    const distToCenter = Math.sqrt(t.position.x**2 + t.position.z**2);
-                    const angleToCenter = Math.atan2(-t.position.z, -t.position.x);
-                    
-                    // On mélange la direction vers le centre et sa direction actuelle
-                    data.angle = THREE.MathUtils.lerp(data.angle, angleToCenter + (Math.sin(now/1000)*0.5), 0.02);
-                    
-                    t.position.x += Math.cos(data.angle) * data.speed;
-                    t.position.z += Math.sin(data.angle) * data.speed;
-                    t.rotation.y = -data.angle + Math.PI/2;
-                } else {
-                    // Faction : Tourne sur soi-même pour surveiller
-                    if (now > data.nextDecision) {
-                        data.targetAngle = Math.random() * Math.PI * 2;
-                        data.nextDecision = now + 2000 + Math.random()*3000;
+                const dist = t.position.distanceTo(drone.position);
+                if (dist < 25) {
+                    t.lookAt(drone.position.x, 0, drone.position.z);
+                    if (now - t.userData.lastShoot > 2000) {
+                        t.userData.lastShoot = now;
+                        if (Math.random() < 0.15) takeDamage(8);
                     }
-                    t.rotation.y = THREE.MathUtils.lerp(t.rotation.y, data.targetAngle, 0.05);
                 }
             });
 
-            renderer.render(scene, camera);
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            renderer.setScissorTest(false);
+            renderer.setViewport(0, 0, w, h);
+            renderer.render(scene, mainCamera);
+
+            const pipSize = 160;
+            const margin = 15;
+            renderer.setScissorTest(true);
+            renderer.setScissor(w - pipSize - margin, h - pipSize - margin, pipSize, pipSize);
+            renderer.setViewport(w - pipSize - margin, h - pipSize - margin, pipSize, pipSize);
+            scene.background = new THREE.Color(0x000800);
+            renderer.render(scene, aimCamera);
+            scene.background = new THREE.Color(0x05070a);
         }
 
         function gameOver(title, desc, color, success) {
@@ -366,14 +543,18 @@
             document.getElementById('msg-title').innerText = title;
             document.getElementById('msg-title').style.color = color;
             document.getElementById('msg-desc').innerText = desc;
+            
+            // AI Analysis of the end game
+            getTacticalAdvice();
+            
             const btn = document.getElementById('next-btn');
-            if(success) {
-                btn.innerText = "NIVEAU SUIVANT";
-                btn.onclick = () => { currentLevel++; setupLevel(currentLevel); };
-            } else {
-                btn.innerText = "RÉESSAYER";
-                btn.onclick = () => setupLevel(currentLevel);
-            }
+            btn.innerText = success ? "MISSION SUIVANTE" : "RÉESSAYER";
+            btn.onclick = () => { 
+                if(success) {
+                    currentLevel++; 
+                }
+                setupLevel(currentLevel); 
+            };
         }
 
         function initInputs() {
@@ -385,67 +566,46 @@
             const moveJoy = (x, y) => {
                 if(!joyActive) return;
                 const dx = x - joyStart.x, dy = y - joyStart.y;
-                const dist = Math.min(Math.sqrt(dx*dx+dy*dy), 45);
+                const dist = Math.min(Math.sqrt(dx*dx+dy*dy), 40);
                 const ang = Math.atan2(dy, dx);
                 stick.style.transform = `translate(${Math.cos(ang)*dist}px, ${Math.sin(ang)*dist}px)`;
-                gameState.input.x = (Math.cos(ang)*dist)/45;
-                gameState.input.y = (Math.sin(ang)*dist)/45;
+                gameState.input.x = (Math.cos(ang)*dist)/40;
+                gameState.input.y = (Math.sin(ang)*dist)/40;
             };
 
             const viewZone = document.getElementById('view-zone');
             let viewActive = false, viewLastX = 0;
-            const startView = (x) => { viewActive = true; viewLastX = x; };
-            const moveView = (x) => { if(viewActive) { gameState.camTargetAngle -= (x - viewLastX) * 0.007; viewLastX = x; } };
+            viewZone.onmousedown = (e) => { viewActive = true; viewLastX = e.clientX; };
+            viewZone.ontouchstart = (e) => { viewActive = true; viewLastX = e.touches[0].clientX; };
 
-            joyZone.addEventListener('mousedown', e => startJoy(e.clientX, e.clientY));
-            joyZone.addEventListener('touchstart', e => { e.preventDefault(); startJoy(e.touches[0].clientX, e.touches[0].clientY); }, {passive:false});
-            viewZone.addEventListener('mousedown', e => startView(e.clientX));
-            viewZone.addEventListener('touchstart', e => startView(e.touches[0].clientX));
-
-            window.addEventListener('mousemove', e => { moveJoy(e.clientX, e.clientY); moveView(e.clientX); });
-            window.addEventListener('touchmove', e => {
+            window.onmousemove = (e) => { moveJoy(e.clientX, e.clientY); if(viewActive) { gameState.camTargetAngle -= (e.clientX - viewLastX) * 0.007; viewLastX = e.clientX; } };
+            window.ontouchmove = (e) => {
                 for(let t of e.touches) {
                     if(joyActive && t.target.closest('#joystick-zone')) moveJoy(t.clientX, t.clientY);
-                    if(viewActive && t.target.closest('#view-zone')) moveView(t.clientX);
+                    if(viewActive && t.target.closest('#view-zone')) { gameState.camTargetAngle -= (t.clientX - viewLastX) * 0.007; viewLastX = t.clientX; }
                 }
-            }, {passive:false});
+            };
+            window.onmouseup = window.ontouchend = () => { joyActive = viewActive = false; stick.style.transform = "translate(0,0)"; gameState.input = {x:0, y:0}; };
 
-            const resetJoy = () => { joyActive = viewActive = false; stick.style.transform = "translate(0,0)"; gameState.input = {x:0, y:0}; };
-            window.addEventListener('mouseup', resetJoy);
-            window.addEventListener('touchend', resetJoy);
+            joyZone.onmousedown = (e) => startJoy(e.clientX, e.clientY);
+            joyZone.ontouchstart = (e) => { e.preventDefault(); startJoy(e.touches[0].clientX, e.touches[0].clientY); };
 
-            document.getElementById('btn-fire').addEventListener('click', fire);
-            const btnU = document.getElementById('btn-up'), btnD = document.getElementById('btn-down');
-            btnU.onmousedown = btnU.ontouchstart = (e) => { e.preventDefault(); keys.shift = true; };
-            btnU.onmouseup = btnU.onmouseleave = btnU.ontouchend = () => keys.shift = false;
-            btnD.onmousedown = btnD.ontouchstart = (e) => { e.preventDefault(); keys.ctrl = true; };
-            btnD.onmouseup = btnD.onmouseleave = btnD.ontouchend = () => keys.ctrl = false;
+            document.getElementById('btn-fire').onclick = fire;
+            document.getElementById('btn-up').onmousedown = document.getElementById('btn-up').ontouchstart = () => keys.shift = true;
+            document.getElementById('btn-up').onmouseup = document.getElementById('btn-up').ontouchend = () => keys.shift = false;
+            document.getElementById('btn-down').onmousedown = document.getElementById('btn-down').ontouchstart = () => keys.ctrl = true;
+            document.getElementById('btn-down').onmouseup = document.getElementById('btn-down').ontouchend = () => keys.ctrl = false;
 
-            window.addEventListener('keydown', e => {
-                const k = e.key.toLowerCase();
-                if(k === 'z' || k === 'w') keys.w = true; if(k === 's') keys.s = true;
-                if(k === 'q' || k === 'a') keys.a = true; if(k === 'd') keys.d = true;
-                if(e.shiftKey) keys.shift = true; if(e.ctrlKey) keys.ctrl = true;
-                if(k === ' ') fire();
-            });
-            window.addEventListener('keyup', e => {
-                const k = e.key.toLowerCase();
-                if(k === 'z' || k === 'w') keys.w = false; if(k === 's') keys.s = false;
-                if(k === 'q' || k === 'a') keys.a = false; if(k === 'd') keys.d = false;
-                if(!e.shiftKey) keys.shift = false; if(!e.ctrlKey) keys.ctrl = false;
-            });
+            window.onkeydown = (e) => { keys[e.key.toLowerCase()] = true; if(e.code === 'Space') fire(); };
+            window.onkeyup = (e) => keys[e.key.toLowerCase()] = false;
         }
 
-        window.onload = () => {
-            initInputs();
-            setupLevel(1);
-            animate();
+        window.onload = () => { initInputs(); setupLevel(1); animate(); };
+        window.onresize = () => { 
+            mainCamera.aspect = window.innerWidth / window.innerHeight; 
+            mainCamera.updateProjectionMatrix(); 
+            renderer.setSize(window.innerWidth, window.innerHeight); 
         };
-
-        window.addEventListener('resize', () => {
-            if(camera) { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); }
-            if(renderer) renderer.setSize(window.innerWidth, window.innerHeight);
-        });
     </script>
 </body>
 </html>
